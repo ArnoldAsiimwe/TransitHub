@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../constants/theme';
 import { MBARARA_STAGES, TransitStage } from '../../constants/mbararaStages';
-import { MbararaMapMock } from '../../components/maps/MbararaMapMock';
+import { OpenStreetMap } from '../../components/maps/OpenStreetMap';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { OfflineBanner } from '../../components/common/OfflineBanner';
@@ -214,14 +214,15 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Map Area */}
-        <MbararaMapMock
-          pickupStage={pickupStage}
-          destinationStage={destinationStage}
-          vehicleType={vehicleType}
-          distanceKm={estimate.distanceKm}
-          durationMins={estimate.durationMins}
-        />
+        {/* Real Interactive OpenStreetMap Route View */}
+        <View style={styles.mapContainer}>
+          <OpenStreetMap
+            pickupStage={pickupStage}
+            destinationStage={destinationStage}
+            height={220}
+            showAllStages={false}
+          />
+        </View>
 
         {/* Tariff & Fare Estimation Card */}
         <View style={styles.fareCard}>
@@ -541,6 +542,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  mapContainer: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    marginBottom: Spacing.base,
+    ...Shadows.card,
   },
   fareCard: {
     backgroundColor: Colors.surface,

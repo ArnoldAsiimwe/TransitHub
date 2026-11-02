@@ -14,6 +14,7 @@ import { MBARARA_STAGES, TransitStage } from '../../constants/mbararaStages';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { useTrip } from '../../context/TripContext';
+import { OpenStreetMap } from '../../components/maps/OpenStreetMap';
 
 interface MbararaMapScreenProps {
   onStageSelectedForBooking?: () => void;
@@ -122,64 +123,19 @@ export const MbararaMapScreen: React.FC<MbararaMapScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Stylized Municipal Map Board */}
-        <View style={styles.mapVisualContainer}>
-          {/* River Rwizi */}
-          <View style={styles.riverGraphic} />
-          <Text style={styles.riverGraphicLabel}>River Rwizi Corridor</Text>
-
-          {/* Road Network Overlays */}
-          <View style={styles.mainCorridorHighSt} />
-          <View style={styles.mainCorridorBuremba} />
-
-          {/* Stage Pins Plotted Across Mbarara Map */}
-          {MBARARA_STAGES.slice(0, 7).map((stage, index) => {
-            const isSelected = selectedStage.id === stage.id;
-            // Coordinate layout mapping for visualization
-            const positions = [
-              { top: 50, left: '46%' }, // Taxi Park
-              { top: 38, left: '26%' }, // High Street
-              { top: 80, left: '38%' }, // MUST Gate
-              { top: 92, left: '50%' }, // MRRH
-              { top: 32, right: '14%' }, // Kakoba
-              { top: 22, left: '16%' }, // Mile 2
-              { bottom: 20, left: '18%' }, // Ruharo
-            ];
-            const pos = positions[index] || { top: 60, left: '50%' };
-
-            return (
-              <TouchableOpacity
-                key={stage.id}
-                onPress={() => setSelectedStage(stage)}
-                style={[
-                  styles.mapPin,
-                  pos as any,
-                  isSelected && styles.mapPinSelected,
-                ]}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name={stage.isMajorHub ? 'location' : 'pin'}
-                  size={isSelected ? 22 : 16}
-                  color={isSelected ? Colors.primary : Colors.secondary}
-                />
-                <Text
-                  style={[
-                    styles.pinMapLabel,
-                    isSelected && styles.pinMapLabelSelected,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {stage.name.split(' ')[0]}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
+        {/* Real Interactive OpenStreetMap Component */}
+        <View style={styles.mapCardWrapper}>
+          <OpenStreetMap
+            stages={filteredStages}
+            selectedStage={selectedStage}
+            onSelectStage={(stage) => setSelectedStage(stage)}
+            height={280}
+            showAllStages={true}
+          />
           <View style={styles.mapDisclaimer}>
-            <Ionicons name="map-outline" size={12} color={Colors.textInverse} />
+            <Ionicons name="map" size={13} color={Colors.primary} />
             <Text style={styles.mapDisclaimerText}>
-              Interactive Mbarara Municipal Stages • Phase 1 Simulation
+              Live OpenStreetMap • Pan, zoom & tap stage markers across Mbarara
             </Text>
           </View>
         </View>
@@ -427,21 +383,26 @@ const styles = StyleSheet.create({
   pinMapLabelSelected: {
     color: Colors.primaryDark,
   },
+  mapCardWrapper: {
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    marginBottom: Spacing.base,
+    backgroundColor: Colors.surface,
+    ...Shadows.card,
+  },
   mapDisclaimer: {
-    position: 'absolute',
-    bottom: 8,
-    left: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: BorderRadius.full,
-    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#DBEAFE',
   },
   mapDisclaimerText: {
-    fontSize: 9,
-    color: Colors.textInverse,
+    fontSize: 11,
+    color: Colors.primaryDark,
     fontWeight: '600',
   },
   selectedDetailCard: {
