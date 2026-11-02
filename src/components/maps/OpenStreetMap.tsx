@@ -46,12 +46,22 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map {
+    html, body {
       height: 100%;
       width: 100%;
       margin: 0;
       padding: 0;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
       background-color: #f1f5f9;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+      touch-action: none;
     }
     .custom-marker {
       display: flex;
@@ -120,6 +130,15 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19
     }).addTo(map);
+
+    // Prevent touch gestures inside map from propagating out to parent React Native scrollviews
+    var mapEl = document.getElementById('map');
+    function stopScrollPropagation(e) {
+      e.stopPropagation();
+    }
+    mapEl.addEventListener('touchstart', stopScrollPropagation, { passive: false });
+    mapEl.addEventListener('touchmove', stopScrollPropagation, { passive: false });
+    mapEl.addEventListener('touchend', stopScrollPropagation, { passive: false });
 
     var stagesData = ${JSON.stringify(stagesToRender)};
     var selectedId = "${selectedStage ? selectedStage.id : ''}";

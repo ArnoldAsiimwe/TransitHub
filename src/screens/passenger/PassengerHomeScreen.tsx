@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Dimensions,
   Modal,
   ScrollView,
   StyleSheet,
@@ -44,6 +45,12 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
   const { driversList } = useAuth();
   const { weather } = useWeather();
   const [stagePickerTarget, setStagePickerTarget] = useState<'pickup' | 'destination' | null>(null);
+  const [showPricePopup, setShowPricePopup] = useState(false);
+  const [justSelectedStage, setJustSelectedStage] = useState<TransitStage | null>(null);
+
+  // 2/3 of phone screen height
+  const screenHeight = Dimensions.get('window').height;
+  const mapHeight = Math.round((screenHeight * 2) / 3);
 
   // Quick stages for quick one-tap commuting
   const quickStages = MBARARA_STAGES.slice(0, 5);
@@ -51,6 +58,12 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
   const handleQuickRequest = () => {
     requestRide();
     onNavigateToTracking();
+  };
+
+  const onMapStageSelected = (stage: TransitStage) => {
+    setDestinationStage(stage);
+    setJustSelectedStage(stage);
+    setShowPricePopup(true);
   };
 
   return (
@@ -214,14 +227,21 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Real Interactive OpenStreetMap Route View */}
+        {/* Real Interactive OpenStreetMap Route View (2/3 of screen) */}
         <View style={styles.mapContainer}>
           <OpenStreetMap
             pickupStage={pickupStage}
             destinationStage={destinationStage}
-            height={220}
-            showAllStages={false}
+            height={mapHeight}
+            showAllStages={true}
+            onSelectStage={onMapStageSelected}
           />
+          <View style={styles.mapHintBanner}>
+            <Ionicons name="information-circle" size={14} color={Colors.primary} />
+            <Text style={styles.mapHintText}>
+              Tap any stage pin on the map to set destination & view fare
+            </Text>
+          </View>
         </View>
 
         {/* Tariff & Fare Estimation Card */}
@@ -347,6 +367,8 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
                         setPickupStage(stage);
                       } else {
                         setDestinationStage(stage);
+                        setJustSelectedStage(stage);
+                        setShowPricePopup(true);
                       }
                       setStagePickerTarget(null);
                     }}
@@ -384,6 +406,110 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
                 );
               })}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Price & Trip Estimate Pop-up Modal */}
+      <Modal
+        visible={showPricePopup}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPricePopup(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.pricePopupCard}>
+            <View style={styles.pricePopupHeader}>
+              <View style={styles.priceBadgePill}>
+                <Ionicons name="receipt" size={16} color={Colors.primary} />
+                <Text style={styles.priceBadgeText}>Trip Fare Estimate</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowPricePopup(false)}
+                style={styles.priceCloseBtn}
+              >
+                <Ionicons name="close" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Stage Path Display */}
+            <View style={styles.routeBox}>
+              <View style={styles.routeRow}>
+                <View style={[styles.routeDot, { backgroundColor: Colors.secondary }]} />
+                <View style={styles.routeTextCol}>
+                  <Text style={styles.routeLabel}>FROM (PICKUP)</Text>
+                  <Text style={styles.routeName}>{pickupStage.name}</Text>
+                </View>
+              </View>
+              <View style={styles.routeLine} />
+              <View style={styles.routeRow}>
+                <View style={[styles.routeDot, { backgroundColor: Colors.primary }]} />
+                <View style={styles.routeTextCol}>
+                  <Text style={styles.routeLabel}>TO (DESTINATION)</Text>
+                  <Text style={styles.routeName}>
+                    {justSelectedStage ? justSelectedStage.name : destinationStage.name}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Price Showcase */}
+            <View style={styles.priceShowcase}>
+              <View>
+                <Text style={styles.priceShowcaseLabel}>Regulated Tariff</Text>
+                <Text style={styles.priceShowcaseAmount}>
+                  {estimate.fareUGX.toLocaleString()} UGX
+                </Text>
+              </View>
+              <View style={styles.pricePillsCol}>
+                <Badge
+                  label={`${estimate.distanceKm} km`}
+                  variant="secondary"
+                  size="md"
+                />
+                <Text style={styles.priceEtaText}>~{estimate.durationMins} mins</Text>
+              </View>
+            </View>
+
+            {/* Vehicle Mode Notice */}
+            <View style={styles.vehicleModeBadge}>
+              <Ionicons
+                name={
+                  vehicleType === 'boda'
+                    ? 'bicycle'
+                    : vehicleType === 'taxi'
+                    ? 'car'
+                    : 'car-sport'
+                }
+                size={18}
+                color={Colors.primaryDark}
+              />
+              <Text style={styles.vehicleModeText}>
+                Mode: {vehicleType === 'boda' ? 'Boda Boda' : vehicleType === 'taxi' ? 'Shared Taxi' : 'Special Hire'}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.popupBtnRow}>
+              <Button
+                title="Change"
+                variant="outline"
+                size="md"
+                onPress={() => setShowPricePopup(false)}
+                style={styles.popupOutlineBtn}
+              />
+              <Button
+                title="Book Ride"
+                variant="primary"
+                size="md"
+                iconName="flash"
+                onPress={() => {
+                  setShowPricePopup(false);
+                  handleQuickRequest();
+                }}
+                style={styles.popupPrimaryBtn}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -547,7 +673,23 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
     marginBottom: Spacing.base,
+    backgroundColor: Colors.surface,
     ...Shadows.card,
+  },
+  mapHintBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#DBEAFE',
+  },
+  mapHintText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primaryDark,
   },
   fareCard: {
     backgroundColor: Colors.surface,
@@ -761,5 +903,133 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  /* Price & Route Pop-up Modal Styles */
+  pricePopupCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xl + 10,
+    ...Shadows.modal,
+  },
+  pricePopupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  priceBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.full,
+    gap: 6,
+  },
+  priceBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: 0.3,
+  },
+  priceCloseBtn: {
+    padding: 4,
+  },
+  routeBox: {
+    backgroundColor: Colors.surfaceSubtle,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  routeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: Spacing.md,
+  },
+  routeLine: {
+    width: 2,
+    height: 16,
+    backgroundColor: Colors.border,
+    marginLeft: 4,
+    marginVertical: 2,
+  },
+  routeTextCol: {
+    flex: 1,
+  },
+  routeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 0.4,
+  },
+  routeName: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  priceShowcase: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: Spacing.md,
+  },
+  priceShowcaseLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  priceShowcaseAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: Colors.primaryDark,
+    marginTop: 2,
+  },
+  pricePillsCol: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  priceEtaText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  vehicleModeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.lg,
+    gap: 8,
+  },
+  vehicleModeText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  popupBtnRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  popupOutlineBtn: {
+    flex: 1,
+  },
+  popupPrimaryBtn: {
+    flex: 2,
   },
 });
