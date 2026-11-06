@@ -96,9 +96,8 @@ export const RootNavigator: React.FC = () => {
   if (authScreen === 'welcome') {
     return (
       <WelcomeScreen
-        onSelectRoleAndContinue={handleSelectRoleFromWelcome}
+        onGetStarted={() => setAuthScreen('signup')}
         onNavigateToLogin={() => setAuthScreen('login')}
-        onNavigateToSignUp={() => setAuthScreen('signup')}
       />
     );
   }
