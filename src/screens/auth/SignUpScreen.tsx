@@ -41,7 +41,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     setErrorMessage('');
     const cleanName = fullName.trim();
     const cleanPhone = phone.trim().replace(/\s+/g, '');
@@ -72,11 +72,18 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await signUp(cleanName, cleanPhone, email, password);
       setIsLoading(false);
-      signUp(cleanName, cleanPhone, email, password);
-      onSignUpSuccess();
-    }, 500);
+      if (res.success) {
+        onSignUpSuccess();
+      } else {
+        setErrorMessage(res.error || 'Failed to create account. Please try again.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'An unexpected error occurred.');
+    }
   };
 
   return (

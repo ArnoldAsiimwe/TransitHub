@@ -11,38 +11,29 @@ interface AuthContextType {
   driverApplicationStatus: 'not_applied' | 'pending' | 'verified' | 'rejected';
   driverApplicationData: DriverApplicationData | null;
   switchRole: (role: UserRole) => void;
-  login: (phone: string, password?: string) => boolean;
-  signUp: (name: string, phone: string, email?: string, password?: string) => void;
+  login: (phone: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (name: string, phone: string, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   submitDriverApplication: (data: DriverApplicationData) => void;
   updateDriverOnline: (isOnline: boolean) => void;
   updateDriverVerificationStatus: (driverId: string, status: VerificationStatus) => void;
 }
 
-const DEFAULT_PASSENGER: UserProfile = {
-  id: 'usr_pass_001',
-  name: 'Kiconco Brenda',
-  phone: '+256 782 345 678',
+const DEFAULT_USER: UserProfile = {
+  id: '',
+  name: 'Transit Commuter',
+  phone: '',
   role: 'passenger',
-  email: 'brenda.kiconco@must.ac.ug',
-  joinedDate: 'Jan 2026',
-};
-
-const DEFAULT_ADMIN: UserProfile = {
-  id: 'usr_admin_001',
-  name: 'Eng. Tumusiime Godfrey',
-  phone: '+256 700 112 233',
-  role: 'admin',
-  email: 'transport.admin@mbararacity.go.ug',
-  joinedDate: 'Oct 2024',
+  email: '',
+  joinedDate: 'Today',
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRole, setCurrentRole] = useState<UserRole>('passenger');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_PASSENGER);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER);
   const [drivers, setDrivers] = useState<DriverProfile[]>(MOCK_DRIVERS);
   const [currentDriver, setCurrentDriver] = useState<DriverProfile>(MOCK_DRIVERS[0]);
 
@@ -56,52 +47,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentRole(newRole);
   };
 
-  const login = (phone: string, password?: string): boolean => {
+  const login = async (phone: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     const formattedPhone = phone.startsWith('+256') ? phone : `+256 ${phone.replace(/^0/, '')}`;
-    setUserProfile((prev) => ({
-      ...prev,
-      phone: formattedPhone,
-    }));
-    setCurrentRole('passenger');
-    setIsAuthenticated(true);
+    
+    try {
+      const res = await authService.login(formattedPhone, password);
+      if (res.error) {
+        return { success: false, error: res.error };
+      }
 
-    // Sync with Supabase in background
-    authService.login(formattedPhone, password).then((res) => {
       if (res.profile) {
         setUserProfile(res.profile);
         setCurrentRole(res.profile.role || 'passenger');
+        setIsAuthenticated(true);
+        return { success: true };
       }
-    }).catch((e) => {
-      console.log('[Auth Login Sync]', e);
-    });
 
-    return true;
+      // Fallback
+      setUserProfile({
+        id: `usr_${Date.now()}`,
+        name: 'Transit Commuter',
+        phone: formattedPhone,
+        role: 'passenger',
+        email: '',
+        joinedDate: 'Today',
+      });
+      setCurrentRole('passenger');
+      setIsAuthenticated(true);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Login failed' };
+    }
   };
 
-  const signUp = (name: string, phone: string, email?: string, password?: string) => {
+  const signUp = async (
+    name: string,
+    phone: string,
+    email?: string,
+    password?: string
+  ): Promise<{ success: boolean; error?: string }> => {
     const formattedPhone = phone.startsWith('+256') ? phone : `+256 ${phone.replace(/^0/, '')}`;
-    const newUser: UserProfile = {
-      id: `usr_${Date.now().toString().slice(-5)}`,
-      name: name || 'New Commuter',
-      phone: formattedPhone,
-      email: email || '',
-      role: 'passenger', // All new accounts start as standard passenger/commuter
-      joinedDate: 'Today',
-    };
-    setUserProfile(newUser);
-    setCurrentRole('passenger');
-    setDriverApplicationStatus('not_applied');
-    setDriverApplicationData(null);
-    setIsAuthenticated(true);
-
-    // Sync with Supabase in background
-    authService.signUp(name, formattedPhone, email, password).then((res) => {
-      if (res.profile?.id) {
-        setUserProfile((prev) => ({ ...prev, id: res.profile!.id }));
+    
+    try {
+      const res = await authService.signUp(name, formattedPhone, email, password);
+      if (res.error) {
+        return { success: false, error: res.error };
       }
-    }).catch((e) => {
-      console.log('[Auth SignUp Sync]', e);
-    });
+
+      const createdUser: UserProfile = res.profile || {
+        id: `usr_${Date.now()}`,
+        name: name,
+        phone: formattedPhone,
+        email: email || '',
+        role: 'passenger',
+        joinedDate: 'Today',
+      };
+
+      setUserProfile(createdUser);
+      setCurrentRole('passenger');
+      setDriverApplicationStatus('not_applied');
+      setDriverApplicationData(null);
+      setIsAuthenticated(true);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Registration failed' };
+    }
   };
 
   const logout = () => {
@@ -168,9 +178,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getCurrentUser = (): UserProfile | DriverProfile => {
     if (currentRole === 'driver') {
       return currentDriver;
-    }
-    if (currentRole === 'admin') {
-      return DEFAULT_ADMIN;
     }
     return userProfile;
   };

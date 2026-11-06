@@ -38,7 +38,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setErrorMessage('');
     const cleanPhone = phone.trim().replace(/\s+/g, '');
 
@@ -53,11 +53,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await login(cleanPhone, password);
       setIsLoading(false);
-      login(cleanPhone, password);
-      onLoginSuccess();
-    }, 400);
+      if (res.success) {
+        onLoginSuccess();
+      } else {
+        setErrorMessage(res.error || 'Failed to sign in. Please check your credentials.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMessage(err.message || 'Login error occurred.');
+    }
   };
 
   return (

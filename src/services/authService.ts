@@ -88,11 +88,11 @@ export const authService = {
       return {
         profile: {
           id: 'usr_local_001',
-          name: 'Kiconco Brenda',
+          name: 'Transit Commuter',
           phone,
-          email: 'brenda.kiconco@must.ac.ug',
+          email: `${phone.replace(/[^0-9]/g, '')}@transithub.mbarara.ug`,
           role: 'passenger',
-          joinedDate: 'Jan 2026',
+          joinedDate: 'Active Member',
         },
         error: null,
       };
@@ -113,18 +113,22 @@ export const authService = {
       }
 
       if (data.user) {
+        // Fetch or create public profile
         const { data: profileRow } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
 
+        const profileName = profileRow?.full_name || data.user.user_metadata?.full_name || 'Transit Commuter';
+        const profileRole = (profileRow?.role as UserRole) || (data.user.user_metadata?.role as UserRole) || 'passenger';
+
         const profile: UserProfile = {
           id: data.user.id,
-          name: profileRow?.full_name || 'Transit Commuter',
+          name: profileName,
           phone: profileRow?.phone || phone,
           email: profileRow?.email || data.user.email,
-          role: (profileRow?.role as UserRole) || 'passenger',
+          role: profileRole,
           joinedDate: 'Active Member',
         };
 
