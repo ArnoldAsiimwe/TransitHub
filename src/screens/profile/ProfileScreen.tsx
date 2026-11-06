@@ -129,24 +129,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </View>
       )}
 
-      {driverApplicationStatus === 'pending' && (
-        <View style={styles.pendingApplicationCard}>
-          <View style={styles.pendingAppHeader}>
-            <Ionicons name="time" size={20} color={Colors.warning} />
-            <Text style={styles.pendingAppTitle}>Driver Permit Under Review</Text>
-            <Badge label="Pending" variant="pending" size="sm" />
-          </View>
-          <Text style={styles.pendingAppText}>
-            Vehicle Plate: <Text style={styles.boldText}>{driverApplicationData?.vehiclePlate || 'UFM 842X'}</Text>
-            {'\n'}Base Stage: {driverApplicationData?.stageName || 'Mbarara Central Taxi Park'}
-          </Text>
-          <Text style={styles.pendingAppNote}>
-            Your credentials have been submitted to the Mbarara City Council inspection team.
-            You can test approving it from the Municipal Admin portal!
-          </Text>
-        </View>
-      )}
-
       {driverApplicationStatus === 'verified' && (
         <View style={styles.verifiedDriverCard}>
           <View style={styles.verifiedHeader}>
@@ -155,14 +137,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <Badge label="Verified" variant="verified" size="sm" />
           </View>
           <Text style={styles.verifiedSub}>
-            Your permit is active. Switch to the Driver Terminal to go online and accept trips.
+            Your driver permit is active. Switch between Passenger and Driver mode anytime below.
           </Text>
           <Button
-            title="Switch to Driver Terminal"
+            title={currentRole === 'driver' ? 'Switch to Passenger Mode' : 'Switch to Driver Terminal'}
             variant="secondary"
             size="sm"
-            iconName="speedometer"
-            onPress={() => switchRole('driver')}
+            iconName={currentRole === 'driver' ? 'person' : 'speedometer'}
+            onPress={() => switchRole(currentRole === 'driver' ? 'passenger' : 'driver')}
             style={styles.switchDriverBtn}
           />
         </View>
@@ -184,40 +166,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </View>
       </View>
 
-      {/* Role Switching Selector */}
-      <Text style={styles.sectionTitle}>Switch Role (Evaluator / Testing Mode)</Text>
-      <View style={styles.roleCardGroup}>
-        {roles.map((item) => {
-          const isActive = currentRole === item.role;
-          return (
-            <TouchableOpacity
-              key={item.role}
-              activeOpacity={0.8}
-              onPress={() => switchRole(item.role)}
-              style={[styles.roleItem, isActive && styles.roleItemActive]}
-            >
-              <View style={[styles.roleIconCircle, isActive && styles.roleIconCircleActive]}>
-                <Ionicons
-                  name={item.icon}
-                  size={18}
-                  color={isActive ? Colors.primaryDark : Colors.textSecondary}
-                />
-              </View>
-              <View style={styles.roleTextContainer}>
-                <View style={styles.roleTitleRow}>
-                  <Text style={[styles.roleTitle, isActive && styles.roleTitleActive]}>
-                    {item.label}
-                  </Text>
-                  {isActive && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />}
-                </View>
-                <Text style={styles.roleDescription}>{item.desc}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Saved Mbarara Stages */}
+      {/* Favorite Mbarara Stages */}
       <Text style={styles.sectionTitle}>Favorite Mbarara Stages</Text>
       <View style={styles.favoritesGroup}>
         <View style={styles.favoriteItem}>

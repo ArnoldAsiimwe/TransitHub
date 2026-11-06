@@ -1,17 +1,17 @@
 export const Colors = {
-  // Brand colors - Warm Ugandan transport amber & deep lake teal
-  primary: '#E65100', // Deep energetic amber/orange
-  primaryLight: '#FF833A',
-  primaryDark: '#AC1900',
-  primarySurface: '#FFF3E0',
+  // Brand colors - Rich Ugandan Emerald Green Theme
+  primary: '#059669', // Emerald transit green
+  primaryLight: '#34D399',
+  primaryDark: '#064E3B',
+  primarySurface: '#ECFDF5',
 
-  secondary: '#00695C', // Deep teal (Lake Victoria / Ankole landscape)
-  secondaryLight: '#439889',
-  secondaryDark: '#003D33',
-  secondarySurface: '#E0F2F1',
+  secondary: '#0F766E', // Deep Teal / Ankole landscape
+  secondaryLight: '#2DD4BF',
+  secondaryDark: '#134E4A',
+  secondarySurface: '#F0FDFA',
 
-  accent: '#F59E0B', // Matatu / Boda yellow
-  accentLight: '#FDE68A',
+  accent: '#10B981', // Radiant green accent
+  accentLight: '#A7F3D0',
 
   // Status colors
   success: '#10B981',
@@ -20,8 +20,8 @@ export const Colors = {
   warningSurface: '#FFFBEB',
   error: '#EF4444',
   errorSurface: '#FEF2F2',
-  info: '#3B82F6',
-  infoSurface: '#EFF6FF',
+  info: '#0284C7',
+  infoSurface: '#F0F9FF',
 
   // Neutrals & Backgrounds
   background: '#F8FAFC',

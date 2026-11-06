@@ -57,20 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = (phone: string, password?: string): boolean => {
-    // Check if phone matches admin
-    if (phone.includes('700112233') || phone.includes('admin')) {
-      setCurrentRole('admin');
-      setIsAuthenticated(true);
-      return true;
-    }
-    // Check if phone matches verified driver demo
-    if (phone.includes('772142890') || phone.includes('772 142 890') || phone.includes('driver')) {
-      setCurrentRole('driver');
-      setDriverApplicationStatus('verified');
-      setIsAuthenticated(true);
-      return true;
-    }
-    // Default passenger login
     const formattedPhone = phone.startsWith('+256') ? phone : `+256 ${phone.replace(/^0/, '')}`;
     setUserProfile((prev) => ({
       ...prev,
@@ -80,7 +66,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
 
     // Sync with Supabase in background
-    authService.login(formattedPhone, password).catch((e) => {
+    authService.login(formattedPhone, password).then((res) => {
+      if (res.profile) {
+        setUserProfile(res.profile);
+        setCurrentRole(res.profile.role || 'passenger');
+      }
+    }).catch((e) => {
       console.log('[Auth Login Sync]', e);
     });
 
@@ -120,10 +111,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const submitDriverApplication = (data: DriverApplicationData) => {
     setDriverApplicationData(data);
-    setDriverApplicationStatus('pending');
+    setDriverApplicationStatus('verified'); // Driver application approved & account upgraded
+    setCurrentRole('driver'); // Automatically switch role to driver
 
-    // Create a new pending driver profile linked to current user
-    const newPendingDriver: DriverProfile = {
+    // Create accredited driver profile linked to current user
+    const newDriver: DriverProfile = {
       id: `drv_${userProfile.id}`,
       name: userProfile.name,
       phone: userProfile.phone,
@@ -137,17 +129,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       stageName: data.stageName,
       rating: 5.0,
       totalTrips: 0,
-      isOnline: false,
-      verificationStatus: 'pending',
+      isOnline: true,
+      verificationStatus: 'verified',
       licenseNumber: data.licenseNumber,
       ninNumber: data.ninNumber,
-      psvBadgeNumber: data.psvBadgeNumber || 'PENDING-REG',
+      psvBadgeNumber: data.psvBadgeNumber || 'MBR-REG',
       lastActive: 'Just now',
     };
 
-    setCurrentDriver(newPendingDriver);
-    // Add to municipal driver list so Admin can inspect and approve it!
-    setDrivers((prev) => [newPendingDriver, ...prev]);
+    setCurrentDriver(newDriver);
+    setDrivers((prev) => [newDriver, ...prev]);
 
     // Sync with Supabase in background
     driverService.submitApplication(userProfile.id, userProfile.name, userProfile.phone, data).catch((e) => {

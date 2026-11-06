@@ -86,36 +86,6 @@ export const Header: React.FC<HeaderProps> = ({
               <Text style={styles.sosText}>SOS</Text>
             </TouchableOpacity>
           )}
-
-          {currentRole && onRoleSwitch && (
-            <TouchableOpacity
-              onPress={() => {
-                const nextRole: UserRole =
-                  currentRole === 'passenger'
-                    ? 'driver'
-                    : currentRole === 'driver'
-                    ? 'admin'
-                    : 'passenger';
-                onRoleSwitch(nextRole);
-              }}
-              style={styles.roleChip}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            >
-              <Ionicons
-                name={
-                  currentRole === 'passenger'
-                    ? 'person'
-                    : currentRole === 'driver'
-                    ? 'speedometer'
-                    : 'shield'
-                }
-                size={13}
-                color={Colors.secondaryDark}
-              />
-              <Text style={styles.roleText}>{currentRole.toUpperCase()}</Text>
-              <Ionicons name="swap-horizontal" size={12} color={Colors.secondaryDark} />
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </View>

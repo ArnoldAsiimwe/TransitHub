@@ -60,21 +60,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }, 400);
   };
 
-  const handleQuickDemo = (demoType: 'passenger' | 'driver' | 'admin') => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (demoType === 'admin') {
-        login('+256 700 112 233');
-      } else if (demoType === 'driver') {
-        login('+256 772 142 890');
-      } else {
-        login('+256 782 345 678');
-      }
-      onLoginSuccess();
-    }, 300);
-  };
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
@@ -189,34 +174,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onPress={handleLogin}
             style={styles.submitButton}
           />
-
-          {/* Quick Demo Login Chips (for effortless prototype testing) */}
-          <View style={styles.demoSection}>
-            <Text style={styles.demoSectionTitle}>Fast Demo Accounts:</Text>
-            <View style={styles.demoChipsRow}>
-              <TouchableOpacity
-                style={styles.demoChip}
-                onPress={() => handleQuickDemo('passenger')}
-              >
-                <Ionicons name="person" size={13} color={Colors.primary} />
-                <Text style={styles.demoChipText}>Passenger</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.demoChip}
-                onPress={() => handleQuickDemo('driver')}
-              >
-                <Ionicons name="speedometer" size={13} color={Colors.secondary} />
-                <Text style={styles.demoChipText}>Verified Rider</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.demoChip}
-                onPress={() => handleQuickDemo('admin')}
-              >
-                <Ionicons name="shield" size={13} color="#1E293B" />
-                <Text style={styles.demoChipText}>City Admin</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Sign Up Link */}
           <View style={styles.switchAuthRow}>
@@ -386,43 +343,6 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: Spacing.sm,
     marginBottom: Spacing.lg,
-  },
-  demoSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: Spacing.xl,
-    ...Shadows.card,
-  },
-  demoSectionTitle: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-  },
-  demoChipsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  demoChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surfaceSubtle,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.sm,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  demoChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textPrimary,
   },
   switchAuthRow: {
     flexDirection: 'row',

@@ -185,12 +185,6 @@ export const RootNavigator: React.FC = () => {
         subtitle={headerSubtitle}
         showLogo={activeTab === 'home' && passengerSubScreen === 'home'}
         currentRole={currentRole}
-        onRoleSwitch={(newRole) => {
-          switchRole(newRole);
-          if (newRole === 'passenger') {
-            setPassengerSubScreen(activeTrip ? 'tracking' : 'home');
-          }
-        }}
         onBack={showBackButton ? onBackAction : undefined}
         onOpenSos={() => setIsSosOpen(true)}
       />
