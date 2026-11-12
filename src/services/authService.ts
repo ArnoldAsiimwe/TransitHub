@@ -1,5 +1,9 @@
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { UserProfile, UserRole } from '../types';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export const authService = {
   /**
@@ -142,8 +146,91 @@ export const authService = {
   },
 
   /**
-   * Log out of current session
+   * Sign in with Google via Supabase OAuth
    */
+  async signInWithGoogle(): Promise<{ profile: UserProfile | null; error: string | null }> {
+    if (!isSupabaseConfigured()) {
+      return { profile: null, error: 'Database is not configured for Google Sign In.' };
+    }
+
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri({
+        scheme: 'transithub',
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        return { profile: null, error: error.message };
+      }
+
+      if (!data?.url) {
+        return { profile: null, error: 'Unable to initialize Google Sign In URL.' };
+      }
+
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+      if (res.type === 'success' && res.url) {
+        // Extract access_token & refresh_token from url fragment or query
+        const urlObj = new URL(res.url);
+        const params = new URLSearchParams(urlObj.hash.substring(1) || urlObj.search);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionErr) {
+            return { profile: null, error: sessionErr.message };
+          }
+
+          if (sessionData.user) {
+            const user = sessionData.user;
+            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || 'Google Commuter';
+            const phone = user.user_metadata?.phone || '+256 700 000 000';
+            const email = user.email || '';
+
+            // Ensure profile exists in profiles table
+            await supabase.from('profiles').upsert({
+              id: user.id,
+              full_name: fullName,
+              phone: phone,
+              email: email,
+              role: 'passenger',
+            });
+
+            const profile: UserProfile = {
+              id: user.id,
+              name: fullName,
+              phone: phone,
+              email: email,
+              role: 'passenger',
+              joinedDate: 'Active Member',
+            };
+
+            return { profile, error: null };
+          }
+        }
+      }
+
+      if (res.type === 'cancel') {
+        return { profile: null, error: 'Google sign in was cancelled.' };
+      }
+
+      return { profile: null, error: 'Failed to complete Google authentication.' };
+    } catch (err: any) {
+      return { profile: null, error: err.message || 'Error signing in with Google.' };
+    }
+  },
   async logout(): Promise<void> {
     if (isSupabaseConfigured()) {
       try {

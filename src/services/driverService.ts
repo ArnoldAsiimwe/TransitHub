@@ -89,8 +89,7 @@ export const driverService = {
 
       const { data, error } = await query;
       if (error || !data || data.length === 0) {
-        // Fallback to local mocks if remote returns empty in testing
-        return MOCK_DRIVERS;
+        return [];
       }
 
       return data.map((d: any) => ({
@@ -115,7 +114,7 @@ export const driverService = {
         lastActive: 'Online now',
       }));
     } catch {
-      return MOCK_DRIVERS;
+      return [];
     }
   },
 

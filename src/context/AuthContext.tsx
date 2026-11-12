@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { DriverApplicationData, DriverProfile, UserProfile, UserRole, VerificationStatus } from '../types';
 import { MOCK_DRIVERS } from '../constants/mockData';
 import { authService, driverService } from '../services';
+import { isSupabaseConfigured } from '../services/supabase';
 
 interface AuthContextType {
   currentUser: UserProfile | DriverProfile;
@@ -13,6 +14,7 @@ interface AuthContextType {
   switchRole: (role: UserRole) => void;
   login: (phone: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (name: string, phone: string, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   submitDriverApplication: (data: DriverApplicationData) => void;
   updateDriverOnline: (isOnline: boolean) => void;
@@ -28,14 +30,57 @@ const DEFAULT_USER: UserProfile = {
   joinedDate: 'Today',
 };
 
+const createDriverFromUser = (user: UserProfile): DriverProfile => ({
+  id: `drv_${user.id || 'default'}`,
+  name: user.name || 'Transit Operator',
+  phone: user.phone || '',
+  role: 'driver',
+  email: user.email,
+  joinedDate: user.joinedDate || 'Today',
+  vehicleType: 'boda',
+  vehiclePlate: 'UEX 000A',
+  vehicleModel: 'Bajaj Boxer BM150',
+  stageId: 'stg_garamba',
+  stageName: 'Garamba Stage',
+  rating: 5.0,
+  totalTrips: 0,
+  isOnline: true,
+  verificationStatus: 'verified',
+  licenseNumber: 'DL-UG-000000',
+  ninNumber: 'CM000000000000',
+  psvBadgeNumber: 'MBR-REG',
+  lastActive: 'Online now',
+});
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentRole, setCurrentRole] = useState<UserRole>('passenger');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER);
-  const [drivers, setDrivers] = useState<DriverProfile[]>(MOCK_DRIVERS);
-  const [currentDriver, setCurrentDriver] = useState<DriverProfile>(MOCK_DRIVERS[0]);
+  const [drivers, setDrivers] = useState<DriverProfile[]>(
+    isSupabaseConfigured() ? [] : MOCK_DRIVERS
+  );
+  const [currentDriver, setCurrentDriver] = useState<DriverProfile>(() =>
+    createDriverFromUser(DEFAULT_USER)
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isSupabaseConfigured()) {
+      driverService
+        .getAvailableDrivers()
+        .then((fetched) => {
+          if (isMounted) {
+            setDrivers(fetched);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
 
   // Driver Application state for the current user
   const [driverApplicationStatus, setDriverApplicationStatus] = useState<
@@ -59,6 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.profile) {
         setUserProfile(res.profile);
         setCurrentRole(res.profile.role || 'passenger');
+        if (res.profile.role === 'driver') {
+          setCurrentDriver(createDriverFromUser(res.profile));
+        }
         setIsAuthenticated(true);
         return { success: true };
       }
@@ -114,8 +162,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await authService.signInWithGoogle();
+      if (res.error) {
+        return { success: false, error: res.error };
+      }
+
+      if (res.profile) {
+        setUserProfile(res.profile);
+        setCurrentRole(res.profile.role || 'passenger');
+        if (res.profile.role === 'driver') {
+          setCurrentDriver(createDriverFromUser(res.profile));
+        }
+        setIsAuthenticated(true);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Google authentication did not return a profile.' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Google sign in failed.' };
+    }
+  };
+
   const logout = () => {
     setIsAuthenticated(false);
+    setUserProfile(DEFAULT_USER);
+    setCurrentDriver(createDriverFromUser(DEFAULT_USER));
+    setDriverApplicationStatus('not_applied');
+    setDriverApplicationData(null);
+    setCurrentRole('passenger');
     authService.logout().catch(() => {});
   };
 
@@ -194,6 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchRole,
         login,
         signUp,
+        loginWithGoogle,
         logout,
         submitDriverApplication,
         updateDriverOnline,

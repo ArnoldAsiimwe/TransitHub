@@ -18,13 +18,14 @@ export const tripService = {
     destinationStage: TransitStage,
     vehicleType: VehicleType,
     estimate: TripEstimateInput,
-    driver?: DriverProfile
+    driver?: DriverProfile,
+    passengerInfo?: { name?: string; phone?: string }
   ): Promise<{ trip: TripRequest | null; error: string | null }> {
     const localTrip: TripRequest = {
       id: `trp_${Date.now().toString().slice(-6)}`,
       passengerId,
-      passengerName: 'Kiconco Brenda',
-      passengerPhone: '+256 782 345 678',
+      passengerName: passengerInfo?.name || 'Transit Commuter',
+      passengerPhone: passengerInfo?.phone || '+256 700 000 000',
       pickupStage,
       destinationStage,
       vehicleType,

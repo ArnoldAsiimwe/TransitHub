@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Linking,
   SafeAreaView,
@@ -47,24 +48,37 @@ export const TripTrackingScreen: React.FC<TripTrackingScreenProps> = ({
     );
   }
 
+  // Countdown timer for driver arrival (in seconds)
+  const initialEtaSeconds = Math.max((activeTrip.estimatedDurationMins || 5) * 60, 180);
+  const [etaSeconds, setEtaSeconds] = useState(initialEtaSeconds);
+
+  useEffect(() => {
+    if (activeTrip.status === 'completed') {
+      setEtaSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setEtaSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeTrip.status]);
+
+  const etaMinutes = Math.floor(etaSeconds / 60);
+  const etaRemainingSecs = etaSeconds % 60;
+  const formattedEta = `${etaMinutes}m ${etaRemainingSecs < 10 ? '0' : ''}${etaRemainingSecs}s`;
+
   const steps: { key: TripStatus; label: string; desc: string }[] = [
-    { key: 'requested', label: 'Requested', desc: 'Dispatched to nearby operators' },
-    { key: 'accepted', label: 'Accepted', desc: 'Driver confirmed your ride' },
-    { key: 'arriving', label: 'Arriving', desc: 'Driver is reaching your stage' },
-    { key: 'in_transit', label: 'In Transit', desc: 'Heading towards destination' },
+    { key: 'requested', label: 'Requested', desc: 'Connecting to verified Mbarara drivers' },
+    { key: 'accepted', label: 'Accepted', desc: 'Driver confirmed & assigned to your ride' },
+    { key: 'arriving', label: 'Arriving', desc: `Driver heading to ${activeTrip.pickupStage.name}` },
+    { key: 'in_transit', label: 'In Transit', desc: `En route to ${activeTrip.destinationStage.name}` },
     { key: 'completed', label: 'Completed', desc: 'Arrived safely at destination' },
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === activeTrip.status);
   const effectiveIndex = currentStepIndex === -1 ? 0 : currentStepIndex;
-
-  const handleNextSimulationStep = () => {
-    if (activeTrip.status === 'requested') updateTripStatus('accepted');
-    else if (activeTrip.status === 'accepted') updateTripStatus('arriving');
-    else if (activeTrip.status === 'arriving') updateTripStatus('in_transit');
-    else if (activeTrip.status === 'in_transit') updateTripStatus('completed');
-    else if (activeTrip.status === 'completed') resetTrip();
-  };
 
   const handleCallDriver = () => {
     const phone = activeTrip.driverPhone || '+256772142890';
@@ -154,54 +168,87 @@ export const TripTrackingScreen: React.FC<TripTrackingScreenProps> = ({
             })}
           </View>
 
-          {/* Prototype simulation control */}
-          <TouchableOpacity
-            style={styles.simulationPill}
-            onPress={handleNextSimulationStep}
-          >
-            <Ionicons name="play-forward-circle" size={16} color={Colors.primary} />
-            <Text style={styles.simulationText}>
-              {activeTrip.status === 'completed'
-                ? 'Reset & Start New Trip'
-                : 'Simulate Next Trip Milestone ➔'}
-            </Text>
-          </TouchableOpacity>
+          {/* Real-time Driver ETA and Booking Progress Counter */}
+          <View style={styles.etaProgressBox}>
+            <View style={styles.etaIconCircle}>
+              <Ionicons
+                name={activeTrip.status === 'completed' ? 'checkmark-circle' : 'time'}
+                size={22}
+                color={Colors.primary}
+              />
+            </View>
+            <View style={styles.etaTextCol}>
+              <Text style={styles.etaHeading}>
+                {activeTrip.status === 'completed'
+                  ? 'Trip Completed'
+                  : activeTrip.status === 'in_transit'
+                  ? 'Estimated Arrival at Destination'
+                  : 'Driver Arriving In'}
+              </Text>
+              <Text style={styles.etaCountdown}>
+                {activeTrip.status === 'completed' ? 'Arrived safely' : formattedEta}
+              </Text>
+            </View>
+            {activeTrip.status === 'completed' && (
+              <TouchableOpacity
+                style={styles.doneTripBtn}
+                onPress={resetTrip}
+              >
+                <Text style={styles.doneTripBtnText}>New Ride</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Driver Identification Card */}
         <View style={styles.driverSection}>
           <Text style={styles.sectionHeading}>Assigned Operator</Text>
-          <View style={styles.driverCard}>
-            <View style={styles.driverTopRow}>
-              <View style={styles.driverAvatar}>
-                <Ionicons
-                  name={activeTrip.vehicleType === 'boda' ? 'bicycle' : 'car'}
-                  size={26}
-                  color={Colors.primary}
-                />
-              </View>
-              <View style={styles.driverInfo}>
-                <View style={styles.nameVerifiedRow}>
-                  <Text style={styles.driverName}>{activeTrip.driverName}</Text>
-                  <Badge label="Verified" variant="verified" size="sm" />
+          {activeTrip.driverName ? (
+            <View style={styles.driverCard}>
+              <View style={styles.driverTopRow}>
+                <View style={styles.driverAvatar}>
+                  <Ionicons
+                    name={activeTrip.vehicleType === 'boda' ? 'bicycle' : 'car'}
+                    size={26}
+                    color={Colors.primary}
+                  />
                 </View>
-                <View style={styles.plateContainer}>
-                  <Text style={styles.plateText}>
-                    {activeTrip.driverVehiclePlate || 'UFM 842X'}
-                  </Text>
+                <View style={styles.driverInfo}>
+                  <View style={styles.nameVerifiedRow}>
+                    <Text style={styles.driverName}>{activeTrip.driverName}</Text>
+                    <Badge label="Verified" variant="verified" size="sm" />
+                  </View>
+                  {activeTrip.driverVehiclePlate ? (
+                    <View style={styles.plateContainer}>
+                      <Text style={styles.plateText}>
+                        {activeTrip.driverVehiclePlate}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
+
+                {activeTrip.driverPhone ? (
+                  <TouchableOpacity style={styles.callIconBtn} onPress={handleCallDriver}>
+                    <Ionicons name="call" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
-              <TouchableOpacity style={styles.callIconBtn} onPress={handleCallDriver}>
-                <Ionicons name="call" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+              {activeTrip.driverPhone ? (
+                <View style={styles.phoneRow}>
+                  <Ionicons name="phone-portrait-outline" size={14} color={Colors.textSecondary} />
+                  <Text style={styles.phoneText}>{activeTrip.driverPhone}</Text>
+                </View>
+              ) : null}
             </View>
-
-            <View style={styles.phoneRow}>
-              <Ionicons name="phone-portrait-outline" size={14} color={Colors.textSecondary} />
-              <Text style={styles.phoneText}>{activeTrip.driverPhone}</Text>
+          ) : (
+            <View style={styles.dispatchingCard}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.dispatchingText}>
+                Connecting to active verified drivers at {activeTrip.pickupStage.name}...
+              </Text>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Trip Route Summary */}
@@ -373,19 +420,50 @@ const styles = StyleSheet.create({
   stepLabelActive: {
     color: Colors.textPrimary,
   },
-  simulationPill: {
+  etaProgressBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: Colors.primarySurface,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.full,
-    gap: 6,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
     marginTop: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  simulationText: {
+  etaIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  etaTextCol: {
+    flex: 1,
+  },
+  etaHeading: {
     fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  etaCountdown: {
+    fontSize: Typography.fontSize.base,
     color: Colors.primaryDark,
+    fontWeight: '800',
+    marginTop: 1,
+  },
+  doneTripBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: BorderRadius.full,
+  },
+  doneTripBtnText: {
+    color: '#FFFFFF',
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   sectionHeading: {
@@ -406,6 +484,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     ...Shadows.card,
+  },
+  dispatchingCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dispatchingText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    flex: 1,
   },
   driverTopRow: {
     flexDirection: 'row',

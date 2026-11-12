@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { BorderRadius, Colors, Shadows, Spacing, Typography } from '../../constants/theme';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
+import { EmptyState } from '../../components/common/EmptyState';
 import { MBARARA_STAGES } from '../../constants/mbararaStages';
 import { useTrip } from '../../context/TripContext';
+import { useAuth } from '../../context/AuthContext';
+import { tripService } from '../../services';
 import { VehicleType } from '../../types';
 
 interface HistoryItem {
@@ -29,76 +33,60 @@ interface HistoryItem {
   status: 'completed' | 'cancelled';
 }
 
-const MOCK_PAST_TRIPS: HistoryItem[] = [
-  {
-    id: 'trip_hist_01',
-    date: 'Today',
-    time: '08:15 AM',
-    pickupStage: 'MUST Main Gate (University)',
-    destStage: 'Mbarara Central Taxi Park',
-    vehicleType: 'boda',
-    fareUGX: 2000,
-    driverName: 'Mugisha Dennis',
-    driverPlate: 'UFM 842X',
-    driverRating: 4.9,
-    status: 'completed',
-  },
-  {
-    id: 'trip_hist_02',
-    date: 'Yesterday',
-    time: '05:40 PM',
-    pickupStage: 'High Street (Town Centre)',
-    destStage: 'Mile 2 (Kamukuzi Hill)',
-    vehicleType: 'boda',
-    fareUGX: 2500,
-    driverName: 'Asiimwe Brian',
-    driverPlate: 'UFL 319B',
-    driverRating: 4.8,
-    status: 'completed',
-  },
-  {
-    id: 'trip_hist_03',
-    date: '21 Oct 2026',
-    time: '01:10 PM',
-    pickupStage: 'Kakoba Central Market',
-    destStage: 'Mbarara Regional Referral Hospital',
-    vehicleType: 'taxi',
-    fareUGX: 1500,
-    driverName: 'Katusiime Innocent',
-    driverPlate: 'UBJ 512K',
-    driverRating: 4.7,
-    status: 'completed',
-  },
-  {
-    id: 'trip_hist_04',
-    date: '19 Oct 2026',
-    time: '09:20 PM',
-    pickupStage: 'High Street (Town Centre)',
-    destStage: 'Katete Bridge Stage',
-    vehicleType: 'boda',
-    fareUGX: 2500,
-    driverName: 'Tumukunde Alex',
-    driverPlate: 'UFN 904C',
-    driverRating: 4.6,
-    status: 'completed',
-  },
-];
-
 interface TripHistoryScreenProps {
   onRebookTrip?: () => void;
 }
 
 export const TripHistoryScreen: React.FC<TripHistoryScreenProps> = ({ onRebookTrip }) => {
   const { setPickupStage, setDestinationStage, setVehicleType } = useTrip();
+  const { currentUser } = useAuth();
   const [filter, setFilter] = useState<'all' | 'boda' | 'taxi'>('all');
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryItem | null>(null);
+  const [trips, setTrips] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const filteredTrips = MOCK_PAST_TRIPS.filter((t) => {
+  useEffect(() => {
+    let isMounted = true;
+    if (currentUser?.id) {
+      tripService
+        .getTripHistory(currentUser.id)
+        .then((history) => {
+          if (isMounted) {
+            const mapped: HistoryItem[] = history.map((t) => ({
+              id: t.id,
+              date: t.createdAt || 'Recent',
+              time: 'Completed',
+              pickupStage: t.pickupStage.name,
+              destStage: t.destinationStage.name,
+              vehicleType: t.vehicleType,
+              fareUGX: t.fareUGX,
+              driverName: t.driverName || 'Registered Driver',
+              driverPlate: t.driverVehiclePlate || 'Accredited',
+              driverRating: t.driverRating || 5.0,
+              status: t.status === 'cancelled' ? 'cancelled' : 'completed',
+            }));
+            setTrips(mapped);
+            setIsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id]);
+
+  const filteredTrips = trips.filter((t) => {
     if (filter === 'all') return true;
     return t.vehicleType === filter;
   });
 
-  const totalSpentUGX = MOCK_PAST_TRIPS.reduce((sum, item) => sum + item.fareUGX, 0);
+  const totalSpentUGX = trips.reduce((sum, item) => sum + item.fareUGX, 0);
 
   const handleRebook = (item: HistoryItem) => {
     const pickup = MBARARA_STAGES.find((s) => s.name === item.pickupStage) || MBARARA_STAGES[0];
@@ -121,7 +109,7 @@ export const TripHistoryScreen: React.FC<TripHistoryScreenProps> = ({ onRebookTr
         </View>
         <View style={styles.summaryBadge}>
           <Ionicons name="receipt-outline" size={16} color={Colors.secondaryDark} />
-          <Text style={styles.summaryBadgeText}>{MOCK_PAST_TRIPS.length} Trips Completed</Text>
+          <Text style={styles.summaryBadgeText}>{trips.length} Trips Completed</Text>
         </View>
       </View>
 
@@ -144,7 +132,16 @@ export const TripHistoryScreen: React.FC<TripHistoryScreenProps> = ({ onRebookTr
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filteredTrips.map((trip) => (
+        {isLoading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+        ) : filteredTrips.length === 0 ? (
+          <EmptyState
+            icon="receipt-outline"
+            title="No Past Trips Yet"
+            description="Your booked and completed trips across Mbarara will appear here with official fare receipts."
+          />
+        ) : (
+          filteredTrips.map((trip) => (
           <View key={trip.id} style={styles.tripCard}>
             <View style={styles.cardHeader}>
               <View style={styles.dateRow}>
@@ -211,7 +208,7 @@ export const TripHistoryScreen: React.FC<TripHistoryScreenProps> = ({ onRebookTr
               />
             </View>
           </View>
-        ))}
+        )))}
       </ScrollView>
 
       {/* Receipt Modal */}

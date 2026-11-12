@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   SafeAreaView,
@@ -14,14 +14,43 @@ import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { EmptyState } from '../../components/common/EmptyState';
 import { useAuth } from '../../context/AuthContext';
-import { MOCK_INCIDENT_REPORTS } from '../../constants/mockData';
 import { SafetyIncident } from '../../types';
 import { adminService } from '../../services';
 
 export const AdminDashboardScreen: React.FC = () => {
   const { driversList, updateDriverVerificationStatus } = useAuth();
   const [activeTab, setActiveTab] = useState<'verification' | 'reports'>('verification');
-  const [reports, setReports] = useState<SafetyIncident[]>(MOCK_INCIDENT_REPORTS);
+  const [reports, setReports] = useState<SafetyIncident[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    adminService
+      .getSafetyReports()
+      .then((fetched) => {
+        if (isMounted && fetched && fetched.length > 0) {
+          setReports(
+            fetched.map((r: any) => ({
+              id: r.id,
+              reporterId: r.reporter_id || 'usr_unknown',
+              reporterName: r.reporter_name || 'Passenger',
+              reporterRole: 'passenger' as const,
+              driverName: r.driver_name,
+              vehiclePlate: r.vehicle_plate,
+              category: (r.report_type as any) || 'reckless_driving',
+              title: r.report_type ? r.report_type.replace('_', ' ') : 'Safety Notice',
+              description: r.description || '',
+              status: (r.resolved ? 'resolved' : 'pending_review') as 'resolved' | 'pending_review',
+              createdAt: new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              locationName: r.location_name || 'Mbarara',
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const pendingDrivers = driversList.filter((d) => d.verificationStatus === 'pending');
   const verifiedDriversCount = driversList.filter((d) => d.verificationStatus === 'verified').length;
@@ -203,42 +232,50 @@ export const AdminDashboardScreen: React.FC = () => {
         {/* Tab 2: Incident Reports */}
         {activeTab === 'reports' && (
           <View style={styles.section}>
-            {reports.map((report) => (
-              <View key={report.id} style={styles.reportCard}>
-                <View style={styles.reportHeader}>
-                  <View style={styles.reportTitleRow}>
-                    <Text style={styles.reportTitle}>{report.title}</Text>
-                    <Badge
-                      label={report.status.replace('_', ' ')}
-                      variant={report.status === 'resolved' ? 'verified' : 'pending'}
-                      size="sm"
-                    />
+            {reports.length === 0 ? (
+              <EmptyState
+                icon="shield-checkmark-outline"
+                title="No Safety Reports"
+                description="All passenger and driver safety reports have been resolved or none are pending."
+              />
+            ) : (
+              reports.map((report) => (
+                <View key={report.id} style={styles.reportCard}>
+                  <View style={styles.reportHeader}>
+                    <View style={styles.reportTitleRow}>
+                      <Text style={styles.reportTitle}>{report.title}</Text>
+                      <Badge
+                        label={report.status.replace('_', ' ')}
+                        variant={report.status === 'resolved' ? 'verified' : 'pending'}
+                        size="sm"
+                      />
+                    </View>
+                    <Text style={styles.reportMeta}>
+                      Reported by {report.reporterName} • {report.createdAt}
+                    </Text>
                   </View>
-                  <Text style={styles.reportMeta}>
-                    Reported by {report.reporterName} • {report.createdAt}
-                  </Text>
-                </View>
 
-                <Text style={styles.reportDescription}>{report.description}</Text>
+                  <Text style={styles.reportDescription}>{report.description}</Text>
 
-                <View style={styles.reportFooter}>
-                  <View style={styles.reportLocation}>
-                    <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-                    <Text style={styles.locationText}>{report.locationName}</Text>
+                  <View style={styles.reportFooter}>
+                    <View style={styles.reportLocation}>
+                      <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                      <Text style={styles.locationText}>{report.locationName}</Text>
+                    </View>
+
+                    {report.status !== 'resolved' && (
+                      <Button
+                        title="Mark Resolved"
+                        variant="outline"
+                        size="sm"
+                        iconName="checkmark-done"
+                        onPress={() => handleResolveReport(report.id)}
+                      />
+                    )}
                   </View>
-
-                  {report.status !== 'resolved' && (
-                    <Button
-                      title="Mark Resolved"
-                      variant="outline"
-                      size="sm"
-                      iconName="checkmark-done"
-                      onPress={() => handleResolveReport(report.id)}
-                    />
-                  )}
                 </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         )}
       </ScrollView>

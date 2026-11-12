@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { MBARARA_STAGES, TransitStage } from '../constants/mbararaStages';
-import { calculateTripEstimate, MOCK_DRIVERS } from '../constants/mockData';
+import { calculateTripEstimate } from '../constants/mockData';
 import { DriverProfile, TripRequest, TripStatus, VehicleType } from '../types';
 import { tripService } from '../services';
+import { useAuth } from './AuthContext';
 
 interface TripContextType {
   pickupStage: TransitStage;
@@ -25,6 +26,7 @@ interface TripContextType {
 const TripContext = createContext<TripContextType | undefined>(undefined);
 
 export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, driversList } = useAuth();
   const [pickupStage, setPickupStage] = useState<TransitStage>(MBARARA_STAGES[2]); // MUST Main Gate
   const [destinationStage, setDestinationStage] = useState<TransitStage>(MBARARA_STAGES[0]); // Central Taxi Park
   const [vehicleType, setVehicleType] = useState<VehicleType>('boda');
@@ -36,12 +38,13 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [pickupStage, destinationStage, vehicleType]);
 
   const requestRide = (selectedDriver?: DriverProfile): TripRequest => {
-    const defaultDriver = selectedDriver || MOCK_DRIVERS[0];
+    // Pick the chosen driver or the first verified driver from database/driversList
+    const assignedDriver = selectedDriver || (driversList && driversList.length > 0 ? driversList[0] : undefined);
     const newTrip: TripRequest = {
       id: `trp_${Date.now().toString().slice(-6)}`,
-      passengerId: 'usr_pass_001',
-      passengerName: 'Kiconco Brenda',
-      passengerPhone: '+256 782 345 678',
+      passengerId: currentUser.id || `usr_${Date.now()}`,
+      passengerName: currentUser.name || 'Transit Commuter',
+      passengerPhone: currentUser.phone || '+256 700 000 000',
       pickupStage,
       destinationStage,
       vehicleType,
@@ -49,11 +52,11 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
       estimatedDurationMins: estimate.durationMins,
       distanceKm: estimate.distanceKm,
       status: 'requested',
-      driverId: defaultDriver.id,
-      driverName: defaultDriver.name,
-      driverPhone: defaultDriver.phone,
-      driverVehiclePlate: defaultDriver.vehiclePlate,
-      driverRating: defaultDriver.rating,
+      driverId: assignedDriver?.id,
+      driverName: assignedDriver?.name,
+      driverPhone: assignedDriver?.phone,
+      driverVehiclePlate: assignedDriver?.vehiclePlate,
+      driverRating: assignedDriver?.rating,
       createdAt: 'Just now',
     };
 
@@ -72,7 +75,8 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
           distanceKm: estimate.distanceKm,
           estimatedMinutes: estimate.durationMins,
         },
-        defaultDriver
+        assignedDriver,
+        { name: newTrip.passengerName, phone: newTrip.passengerPhone }
       )
       .catch((e) => {
         console.log('[Trip Creation Sync]', e);

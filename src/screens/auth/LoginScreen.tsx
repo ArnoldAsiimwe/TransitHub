@@ -29,13 +29,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onBackToWelcome,
   onLoginSuccess,
 }) => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogin = async () => {
@@ -64,6 +65,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     } catch (err: any) {
       setIsLoading(false);
       setErrorMessage(err.message || 'Login error occurred.');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setErrorMessage('');
+    setIsGoogleLoading(true);
+    try {
+      const res = await loginWithGoogle();
+      setIsGoogleLoading(false);
+      if (res.success) {
+        onLoginSuccess();
+      } else {
+        setErrorMessage(res.error || 'Google Sign In was not completed.');
+      }
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      setErrorMessage(err.message || 'Failed to connect to Google.');
     }
   };
 
@@ -181,6 +199,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onPress={handleLogin}
             style={styles.submitButton}
           />
+
+          {/* Google Sign In Divider */}
+          <View style={styles.googleDividerRow}>
+            <View style={styles.googleDividerLine} />
+            <Text style={styles.googleDividerText}>OR CONTINUE WITH</Text>
+            <View style={styles.googleDividerLine} />
+          </View>
+
+          {/* Google Sign In Button */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            activeOpacity={0.85}
+            onPress={handleGoogleSignIn}
+            disabled={isGoogleLoading || isLoading}
+          >
+            <Ionicons name="logo-google" size={20} color="#EA4335" />
+            <Text style={styles.googleButtonText}>
+              {isGoogleLoading ? 'Connecting to Google...' : 'Sign In with Google'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Sign Up Link */}
           <View style={styles.switchAuthRow}>
@@ -349,7 +387,42 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  googleDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.md,
+    gap: Spacing.sm,
+  },
+  googleDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  googleDividerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    gap: 10,
+    marginBottom: Spacing.xl,
+    ...Shadows.card,
+  },
+  googleButtonText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
   switchAuthRow: {
     flexDirection: 'row',

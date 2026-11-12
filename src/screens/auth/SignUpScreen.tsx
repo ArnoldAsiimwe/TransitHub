@@ -28,7 +28,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   onBackToWelcome,
   onSignUpSuccess,
 }) => {
-  const { signUp } = useAuth();
+  const { signUp, loginWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [fullName, setFullName] = useState('');
@@ -39,6 +39,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleSignUp = async () => {
@@ -83,6 +84,23 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     } catch (err: any) {
       setIsLoading(false);
       setErrorMessage(err.message || 'An unexpected error occurred.');
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setErrorMessage('');
+    setIsGoogleLoading(true);
+    try {
+      const res = await loginWithGoogle();
+      setIsGoogleLoading(false);
+      if (res.success) {
+        onSignUpSuccess();
+      } else {
+        setErrorMessage(res.error || 'Google Sign Up was not completed.');
+      }
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      setErrorMessage(err.message || 'Failed to connect to Google.');
     }
   };
 
@@ -263,6 +281,26 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             onPress={handleSignUp}
             style={styles.submitButton}
           />
+
+          {/* Google Sign Up Divider */}
+          <View style={styles.googleDividerRow}>
+            <View style={styles.googleDividerLine} />
+            <Text style={styles.googleDividerText}>OR SIGN UP WITH</Text>
+            <View style={styles.googleDividerLine} />
+          </View>
+
+          {/* Google Sign Up Button */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            activeOpacity={0.85}
+            onPress={handleGoogleSignUp}
+            disabled={isGoogleLoading || isLoading}
+          >
+            <Ionicons name="logo-google" size={20} color="#EA4335" />
+            <Text style={styles.googleButtonText}>
+              {isGoogleLoading ? 'Connecting to Google...' : 'Sign Up with Google'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Already have an account */}
           <View style={styles.switchAuthRow}>
@@ -452,7 +490,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   submitButton: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  googleDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Spacing.md,
+    gap: Spacing.sm,
+  },
+  googleDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  googleDividerText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    gap: 10,
+    marginBottom: Spacing.xl,
+    ...Shadows.card,
+  },
+  googleButtonText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
   },
   switchAuthRow: {
     flexDirection: 'row',
