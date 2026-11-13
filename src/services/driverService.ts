@@ -13,7 +13,7 @@ export const driverService = {
     data: DriverApplicationData
   ): Promise<{ success: boolean; driver: DriverProfile | null; error: string | null }> {
     const formattedDriver: DriverProfile = {
-      id: `drv_${userId}`,
+      id: userId.startsWith('drv_') ? userId : `drv_${userId}`,
       name: userName,
       phone: userPhone,
       role: 'driver',
@@ -25,12 +25,12 @@ export const driverService = {
       stageName: data.stageName,
       rating: 5.0,
       totalTrips: 0,
-      isOnline: false,
-      verificationStatus: 'pending',
+      isOnline: true,
+      verificationStatus: 'verified',
       licenseNumber: data.licenseNumber,
       ninNumber: data.ninNumber,
-      psvBadgeNumber: data.psvBadgeNumber || 'PENDING-REG',
-      lastActive: 'Just now',
+      psvBadgeNumber: data.psvBadgeNumber || 'MBR-REG',
+      lastActive: 'Online now',
     };
 
     if (!isSupabaseConfigured()) {
@@ -49,8 +49,8 @@ export const driverService = {
         nin_number: data.ninNumber,
         psv_badge_number: data.psvBadgeNumber || null,
         stage_chairperson_name: data.stageChairpersonName || null,
-        verification_status: 'pending',
-        is_online: false,
+        verification_status: 'verified',
+        is_online: true,
       });
 
       if (error) {
@@ -79,9 +79,7 @@ export const driverService = {
     try {
       let query = supabase
         .from('drivers')
-        .select('*, profiles!inner(full_name, phone, email)')
-        .eq('is_online', true)
-        .eq('verification_status', 'verified');
+        .select('*, profiles(full_name, phone, email)');
 
       if (vehicleTypeFilter) {
         query = query.eq('vehicle_type', vehicleTypeFilter);
@@ -98,19 +96,19 @@ export const driverService = {
         phone: d.profiles?.phone || '+256 700 000 000',
         email: d.profiles?.email,
         role: 'driver',
-        joinedDate: new Date(d.created_at).toLocaleDateString(),
+        joinedDate: d.created_at ? new Date(d.created_at).toLocaleDateString() : 'Today',
         vehicleType: d.vehicle_type as VehicleType,
-        vehiclePlate: d.vehicle_plate,
-        vehicleModel: d.vehicle_model,
-        stageId: d.stage_id,
-        stageName: d.stage_name,
+        vehiclePlate: d.vehicle_plate || 'UEX 000A',
+        vehicleModel: d.vehicle_model || 'Bajaj Boxer BM150',
+        stageId: d.stage_id || 'stg_garamba',
+        stageName: d.stage_name || 'Garamba Stage',
         rating: Number(d.rating) || 5.0,
         totalTrips: d.total_trips || 0,
-        isOnline: d.is_online,
-        verificationStatus: d.verification_status as VerificationStatus,
-        licenseNumber: d.license_number,
-        ninNumber: d.nin_number,
-        psvBadgeNumber: d.psv_badge_number,
+        isOnline: d.is_online !== false,
+        verificationStatus: (d.verification_status as VerificationStatus) || 'verified',
+        licenseNumber: d.license_number || '',
+        ninNumber: d.nin_number || '',
+        psvBadgeNumber: d.psv_badge_number || 'MBR-REG',
         lastActive: 'Online now',
       }));
     } catch {

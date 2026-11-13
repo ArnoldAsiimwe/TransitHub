@@ -220,12 +220,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setCurrentDriver(newDriver);
-    setDrivers((prev) => [newDriver, ...prev]);
+    setDrivers((prev) => {
+      const filtered = prev.filter((d) => d.id !== newDriver.id);
+      return [newDriver, ...filtered];
+    });
 
     // Sync with Supabase in background
-    driverService.submitApplication(userProfile.id, userProfile.name, userProfile.phone, data).catch((e) => {
-      console.log('[Driver Application Sync]', e);
-    });
+    driverService
+      .submitApplication(userProfile.id, userProfile.name, userProfile.phone, data)
+      .then(() => {
+        // Refresh available drivers list from Supabase
+        driverService.getAvailableDrivers().then((freshList) => {
+          if (freshList && freshList.length > 0) {
+            setDrivers(freshList);
+          }
+        }).catch(() => {});
+      })
+      .catch((e) => {
+        console.log('[Driver Application Sync]', e);
+      });
   };
 
   const updateDriverOnline = (isOnline: boolean) => {
