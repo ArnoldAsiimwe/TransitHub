@@ -32,7 +32,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const { login, loginWithGoogle } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,21 +41,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleLogin = async () => {
     setErrorMessage('');
-    const cleanPhone = phone.trim().replace(/\s+/g, '');
+    const cleanUsername = username.trim();
 
-    if (!cleanPhone) {
-      setErrorMessage('Please enter your mobile phone number.');
+    if (!cleanUsername) {
+      setErrorMessage('Please enter your username (or email/phone).');
       return;
     }
 
-    if (cleanPhone.length < 9) {
-      setErrorMessage('Please enter a valid Ugandan phone number (e.g. 0772 123 456).');
+    if (!password) {
+      setErrorMessage('Please enter your password.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const res = await login(cleanPhone, password);
+      const res = await login(cleanUsername, password);
       setIsLoading(false);
       if (res.success) {
         onLoginSuccess();
@@ -125,22 +125,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </View>
           ) : null}
 
-          {/* Phone Input */}
+          {/* Username Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mobile Phone Number</Text>
-            <View style={styles.phoneInputContainer}>
-              <View style={styles.countryCodeBadge}>
-                <Text style={styles.ugandaFlag}>🇺🇬</Text>
-                <Text style={styles.countryCodeText}>+256</Text>
-              </View>
+            <Text style={styles.inputLabel}>Username or Phone / Email</Text>
+            <View style={styles.usernameInputContainer}>
+              <Ionicons
+                name="person-outline"
+                size={18}
+                color={Colors.textMuted}
+                style={styles.inputLeadingIcon}
+              />
               <TextInput
-                style={styles.phoneInput}
-                placeholder="772 123 456"
+                style={styles.usernameInput}
+                placeholder="Enter your username"
                 placeholderTextColor={Colors.textMuted}
-                keyboardType="phone-pad"
-                value={phone}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={username}
                 onChangeText={(text) => {
-                  setPhone(text);
+                  setUsername(text);
                   if (errorMessage) setErrorMessage('');
                 }}
               />
@@ -318,6 +321,21 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  usernameInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+  },
+  usernameInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: Typography.fontSize.base,
+    color: Colors.textPrimary,
   },
   phoneInputContainer: {
     flexDirection: 'row',

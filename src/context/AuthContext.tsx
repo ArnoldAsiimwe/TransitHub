@@ -92,11 +92,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentRole(newRole);
   };
 
-  const login = async (phone: string, password?: string): Promise<{ success: boolean; error?: string }> => {
-    const formattedPhone = phone.startsWith('+256') ? phone : `+256 ${phone.replace(/^0/, '')}`;
-    
+  const login = async (usernameOrPhone: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await authService.login(formattedPhone, password);
+      const res = await authService.login(usernameOrPhone.trim(), password);
       if (res.error) {
         return { success: false, error: res.error };
       }
@@ -114,8 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Fallback
       setUserProfile({
         id: `usr_${Date.now()}`,
-        name: 'Transit Commuter',
-        phone: formattedPhone,
+        name: usernameOrPhone.trim(),
+        phone: '',
         role: 'passenger',
         email: '',
         joinedDate: 'Today',
@@ -134,10 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email?: string,
     password?: string
   ): Promise<{ success: boolean; error?: string }> => {
-    const formattedPhone = phone.startsWith('+256') ? phone : `+256 ${phone.replace(/^0/, '')}`;
-    
     try {
-      const res = await authService.signUp(name, formattedPhone, email, password);
+      const res = await authService.signUp(name, phone, email, password);
       if (res.error) {
         return { success: false, error: res.error };
       }
@@ -145,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const createdUser: UserProfile = res.profile || {
         id: `usr_${Date.now()}`,
         name: name,
-        phone: formattedPhone,
+        phone: phone || '',
         email: email || '',
         role: 'passenger',
         joinedDate: 'Today',

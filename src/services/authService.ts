@@ -10,17 +10,21 @@ export const authService = {
    * Universal sign-up for all Mbarara transit users
    */
   async signUp(
-    fullName: string,
+    usernameOrName: string,
     phone: string,
     email?: string,
     password?: string
   ): Promise<{ profile: UserProfile | null; error: string | null }> {
+    const cleanUsername = usernameOrName.trim();
+    const cleanPhone = phone ? phone.trim().replace(/\s+/g, '') : '';
+    const securePassword = password || 'TransitMbarara2026!';
+
     if (!isSupabaseConfigured()) {
       // Local fallback mode
       const mockProfile: UserProfile = {
         id: `usr_${Date.now().toString().slice(-6)}`,
-        name: fullName,
-        phone,
+        name: cleanUsername,
+        phone: cleanPhone,
         email: email || '',
         role: 'passenger',
         joinedDate: 'Today',
@@ -29,16 +33,20 @@ export const authService = {
     }
 
     try {
-      const generatedEmail = email || `${phone.replace(/[^0-9]/g, '')}@transithub.mbarara.ug`;
-      const securePassword = password || 'TransitMbarara2026!';
+      // Map username to a safe internal authentication email
+      const normalizedUsername = cleanUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const authEmail = email && email.includes('@')
+        ? email.trim().toLowerCase()
+        : `${normalizedUsername || Date.now()}@transithub.mbarara.ug`;
 
       const { data, error } = await supabase.auth.signUp({
-        email: generatedEmail,
+        email: authEmail,
         password: securePassword,
         options: {
           data: {
-            full_name: fullName,
-            phone,
+            username: cleanUsername,
+            full_name: cleanUsername,
+            phone: cleanPhone,
             role: 'passenger',
           },
         },
@@ -49,24 +57,24 @@ export const authService = {
       }
 
       if (data.user) {
-        // Insert public profile
+        // Upsert public profile record in supabase
         const { error: profileError } = await supabase.from('profiles').upsert({
           id: data.user.id,
-          phone,
-          full_name: fullName,
+          phone: cleanPhone || `usr_${data.user.id.slice(0, 8)}`,
+          full_name: cleanUsername,
           role: 'passenger',
-          email: generatedEmail,
+          email: email || authEmail,
         });
 
         if (profileError) {
-          console.warn('[Supabase Profile Upsert Error]', profileError.message);
+          console.warn('[Supabase Profile Upsert Notice]', profileError.message);
         }
 
         const profile: UserProfile = {
           id: data.user.id,
-          name: fullName,
-          phone,
-          email: generatedEmail,
+          name: cleanUsername,
+          phone: cleanPhone,
+          email: email || authEmail,
           role: 'passenger',
           joinedDate: 'Today',
         };
@@ -74,27 +82,30 @@ export const authService = {
         return { profile, error: null };
       }
 
-      return { profile: null, error: 'Registration succeeded without session.' };
+      return { profile: null, error: 'Registration completed. Please sign in.' };
     } catch (err: any) {
       return { profile: null, error: err.message || 'An unexpected error occurred during sign up.' };
     }
   },
 
   /**
-   * Sign in with phone/email and password
+   * Sign in with username (or email/phone) and password
    */
   async login(
-    phone: string,
+    identifier: string,
     password?: string
   ): Promise<{ profile: UserProfile | null; error: string | null }> {
+    const cleanId = identifier.trim();
+    const loginPass = password || 'TransitMbarara2026!';
+
     if (!isSupabaseConfigured()) {
       // Offline fallback
       return {
         profile: {
           id: 'usr_local_001',
-          name: 'Transit Commuter',
-          phone,
-          email: `${phone.replace(/[^0-9]/g, '')}@transithub.mbarara.ug`,
+          name: cleanId,
+          phone: '',
+          email: `${cleanId}@transithub.mbarara.ug`,
           role: 'passenger',
           joinedDate: 'Active Member',
         },
@@ -103,12 +114,39 @@ export const authService = {
     }
 
     try {
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      const loginEmail = `${cleanPhone}@transithub.mbarara.ug`;
-      const loginPass = password || 'TransitMbarara2026!';
+      // 1. First, check if identifier is an existing email
+      let emailToAuth = cleanId;
+
+      if (!cleanId.includes('@')) {
+        // Look up profile by full_name/username in profiles table
+        const { data: matchedProfiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, phone, role')
+          .ilike('full_name', cleanId)
+          .limit(1);
+
+        if (matchedProfiles && matchedProfiles.length > 0 && matchedProfiles[0].email) {
+          emailToAuth = matchedProfiles[0].email;
+        } else {
+          // Check if cleanId matches phone
+          const { data: phoneProfiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, role')
+            .eq('phone', cleanId)
+            .limit(1);
+
+          if (phoneProfiles && phoneProfiles.length > 0 && phoneProfiles[0].email) {
+            emailToAuth = phoneProfiles[0].email;
+          } else {
+            // Fallback to internal constructed email format
+            const normalizedUsername = cleanId.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            emailToAuth = `${normalizedUsername}@transithub.mbarara.ug`;
+          }
+        }
+      }
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
+        email: emailToAuth,
         password: loginPass,
       });
 
@@ -117,20 +155,20 @@ export const authService = {
       }
 
       if (data.user) {
-        // Fetch or create public profile
+        // Fetch public profile
         const { data: profileRow } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
 
-        const profileName = profileRow?.full_name || data.user.user_metadata?.full_name || 'Transit Commuter';
+        const profileName = profileRow?.full_name || data.user.user_metadata?.full_name || data.user.user_metadata?.username || cleanId;
         const profileRole = (profileRow?.role as UserRole) || (data.user.user_metadata?.role as UserRole) || 'passenger';
 
         const profile: UserProfile = {
           id: data.user.id,
           name: profileName,
-          phone: profileRow?.phone || phone,
+          phone: profileRow?.phone || '',
           email: profileRow?.email || data.user.email,
           role: profileRole,
           joinedDate: 'Active Member',

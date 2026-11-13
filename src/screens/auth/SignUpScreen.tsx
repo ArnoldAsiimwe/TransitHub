@@ -48,12 +48,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
     const cleanPhone = phone.trim().replace(/\s+/g, '');
 
     if (!cleanName) {
-      setErrorMessage('Please enter your full name.');
-      return;
-    }
-
-    if (!cleanPhone || cleanPhone.length < 9) {
-      setErrorMessage('Please enter a valid Ugandan phone number (e.g. 0772 123 456).');
+      setErrorMessage('Please enter your username.');
       return;
     }
 
@@ -159,15 +154,17 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             </View>
           ) : null}
 
-          {/* Full Name */}
+          {/* Username / Full Name */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>Username</Text>
             <View style={styles.inputContainer}>
               <Ionicons name="person-outline" size={18} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. Akampurira Patience"
+                placeholder="Choose a username (e.g. arnold_mbarara)"
                 placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
                 value={fullName}
                 onChangeText={(text) => {
                   setFullName(text);
@@ -177,9 +174,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
             </View>
           </View>
 
-          {/* Phone Number */}
+          {/* Phone Number (Optional) */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mobile Phone Number</Text>
+            <Text style={styles.inputLabel}>Mobile Phone Number (Optional)</Text>
             <View style={styles.phoneInputContainer}>
               <View style={styles.countryCodeBadge}>
                 <Text style={styles.ugandaFlag}>🇺🇬</Text>
@@ -187,7 +184,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
               </View>
               <TextInput
                 style={styles.phoneInput}
-                placeholder="772 123 456"
+                placeholder="772 123 456 (optional)"
                 placeholderTextColor={Colors.textMuted}
                 keyboardType="phone-pad"
                 value={phone}
