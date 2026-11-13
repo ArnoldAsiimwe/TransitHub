@@ -82,7 +82,7 @@ export const tripService = {
   /**
    * Update trip status progression
    */
-  async updateTripStatus(tripId: string, status: TripStatus): Promise<boolean> {
+  async updateTripStatus(tripId: string, status: TripStatus, driver?: DriverProfile): Promise<boolean> {
     if (!isSupabaseConfigured()) return true;
 
     try {
@@ -102,10 +102,126 @@ export const tripService = {
         updates[timestampField] = new Date().toISOString();
       }
 
+      if (driver && status === 'accepted') {
+        const cleanDriverId = driver.id.replace(/^drv_/, '');
+        updates.driver_id = cleanDriverId;
+      }
+
       const { error } = await supabase.from('trips').update(updates).eq('id', tripId);
       return !error;
     } catch {
       return false;
+    }
+  },
+
+  /**
+   * Fetch any incoming trip request for a driver
+   */
+  async getIncomingDriverRequest(driverId?: string): Promise<TripRequest | null> {
+    if (!isSupabaseConfigured()) return null;
+
+    try {
+      const cleanDriverId = driverId ? driverId.replace(/^drv_/, '') : null;
+      let query = supabase
+        .from('trips')
+        .select('*, profiles!trips_passenger_id_fkey(full_name, phone)')
+        .eq('status', 'requested')
+        .order('requested_at', { ascending: false })
+        .limit(1);
+
+      if (cleanDriverId) {
+        query = query.or(`driver_id.is.null,driver_id.eq.${cleanDriverId}`);
+      }
+
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) {
+        return null;
+      }
+
+      const t = data[0];
+      const pickup =
+        MBARARA_STAGES.find((s) => s.id === t.pickup_stage_id) || {
+          ...MBARARA_STAGES[0],
+          name: t.pickup_stage_name || MBARARA_STAGES[0].name,
+        };
+      const dest =
+        MBARARA_STAGES.find((s) => s.id === t.destination_stage_id) || {
+          ...MBARARA_STAGES[1],
+          name: t.destination_stage_name || MBARARA_STAGES[1].name,
+        };
+
+      return {
+        id: t.id,
+        passengerId: t.passenger_id,
+        passengerName: t.profiles?.full_name || 'Passenger',
+        passengerPhone: t.profiles?.phone || '+256 700 000 000',
+        pickupStage: pickup,
+        destinationStage: dest,
+        vehicleType: t.vehicle_type as VehicleType,
+        fareUGX: t.fare_ugx,
+        estimatedDurationMins: 10,
+        distanceKm: Number(t.distance_km) || 2.0,
+        status: 'requested',
+        driverId: t.driver_id,
+        createdAt: 'Just now',
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch active trip for passenger or driver to sync state across devices
+   */
+  async getActiveTrip(userId: string): Promise<TripRequest | null> {
+    if (!isSupabaseConfigured()) return null;
+
+    try {
+      const cleanUserId = userId.replace(/^drv_/, '');
+      const { data, error } = await supabase
+        .from('trips')
+        .select('*, drivers(vehicle_plate, vehicle_model, profiles(full_name, phone)), passenger:profiles!trips_passenger_id_fkey(full_name, phone)')
+        .or(`passenger_id.eq.${cleanUserId},driver_id.eq.${cleanUserId}`)
+        .in('status', ['requested', 'accepted', 'arriving', 'in_transit'])
+        .order('requested_at', { ascending: false })
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        return null;
+      }
+
+      const t = data[0];
+      const pickup =
+        MBARARA_STAGES.find((s) => s.id === t.pickup_stage_id) || {
+          ...MBARARA_STAGES[0],
+          name: t.pickup_stage_name || MBARARA_STAGES[0].name,
+        };
+      const dest =
+        MBARARA_STAGES.find((s) => s.id === t.destination_stage_id) || {
+          ...MBARARA_STAGES[1],
+          name: t.destination_stage_name || MBARARA_STAGES[1].name,
+        };
+
+      return {
+        id: t.id,
+        passengerId: t.passenger_id,
+        passengerName: t.passenger?.full_name || 'Passenger',
+        passengerPhone: t.passenger?.phone || '+256 700 000 000',
+        pickupStage: pickup,
+        destinationStage: dest,
+        vehicleType: t.vehicle_type as VehicleType,
+        fareUGX: t.fare_ugx,
+        estimatedDurationMins: 10,
+        distanceKm: Number(t.distance_km) || 2.0,
+        status: t.status as TripStatus,
+        driverId: t.driver_id,
+        driverName: t.drivers?.profiles?.full_name,
+        driverPhone: t.drivers?.profiles?.phone,
+        driverVehiclePlate: t.drivers?.vehicle_plate,
+        createdAt: 'Just now',
+      };
+    } catch {
+      return null;
     }
   },
 
