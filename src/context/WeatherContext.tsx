@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/theme';
 
@@ -102,25 +102,105 @@ interface WeatherContextType {
   weather: WeatherData;
   setCondition: (condition: WeatherCondition) => void;
   cycleWeather: () => void;
+  refreshLiveWeather: () => Promise<void>;
 }
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
 
 export const WeatherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentCondition, setCurrentCondition] = useState<WeatherCondition>('sunny');
+  const [liveWeather, setLiveWeather] = useState<WeatherData>(WEATHER_PRESETS.sunny);
+
+  // Fetch real Google/Open-Meteo live weather for Mbarara (-0.6132, 30.6582)
+  const refreshLiveWeather = async () => {
+    try {
+      const response = await fetch(
+        'https://api.open-meteo.com/v1/forecast?latitude=-0.6132&longitude=30.6582&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m'
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      const current = data.current;
+      if (!current) return;
+
+      const temp = Math.round(current.temperature_2m);
+      const feelsLike = Math.round(current.apparent_temperature ?? temp);
+      const humidity = Math.round(current.relative_humidity_2m ?? 60);
+      const wind = Math.round(current.wind_speed_10m ?? 10);
+      const code = current.weather_code ?? 0;
+      const precip = current.precipitation ?? 0;
+
+      let determinedCondition: WeatherCondition = 'sunny';
+      let title = 'Sunny & Clear Skies';
+      let advisory = 'Clear roads on High Street & MUST. Optimal conditions for quick Boda Boda travel.';
+      let vehicleRec: 'boda' | 'taxi' | 'any' = 'boda';
+
+      if (precip > 0.1 || [51, 53, 55, 61, 63, 65, 80, 81, 82, 95].includes(code)) {
+        determinedCondition = 'rainy';
+        title = 'Live Showers in Mbarara';
+        advisory = 'Wet asphalt along Kakoba & Katete bridge. Covered Taxis / Special Hires recommended.';
+        vehicleRec = 'taxi';
+      } else if ([1, 2, 3, 45, 48].includes(code)) {
+        determinedCondition = 'cloudy';
+        title = 'Live Overcast in Mbarara';
+        advisory = 'Pleasant breeze along River Rwizi corridor. Standard municipal tariffs apply.';
+        vehicleRec = 'any';
+      } else {
+        const hour = new Date().getHours();
+        if (hour >= 18 || hour < 6) {
+          determinedCondition = 'sunset';
+          title = 'Mbarara Night Transit';
+          advisory = 'Evening commuter rush across Central Taxi Park & High Street. Regulated night tariffs in effect.';
+          vehicleRec = 'boda';
+        } else if (hour >= 16 && hour < 18) {
+          determinedCondition = 'sunset';
+          title = 'Evening Golden Hour';
+          advisory = 'Rush hour across Central Taxi Park & High Street. High vehicle demand at stages.';
+          vehicleRec = 'boda';
+        }
+      }
+
+      setCurrentCondition(determinedCondition);
+      setLiveWeather({
+        ...WEATHER_PRESETS[determinedCondition],
+        title,
+        temperatureC: temp,
+        feelsLikeC: feelsLike,
+        humidityPercent: humidity,
+        windSpeedKmh: wind,
+        rainProbabilityPercent: precip > 0 ? 85 : determinedCondition === 'cloudy' ? 30 : 10,
+        advisoryText: advisory,
+        vehicleRecommendation: vehicleRec,
+      });
+    } catch (err) {
+      // Fallback silently to presets
+    }
+  };
+
+  useEffect(() => {
+    refreshLiveWeather();
+    // Update live weather every 5 minutes
+    const interval = setInterval(refreshLiveWeather, 300000);
+    return () => clearInterval(interval);
+  }, []);
 
   const cycleWeather = () => {
     const list: WeatherCondition[] = ['sunny', 'rainy', 'cloudy', 'sunset'];
     const nextIndex = (list.indexOf(currentCondition) + 1) % list.length;
-    setCurrentCondition(list[nextIndex]);
+    const nextCond = list[nextIndex];
+    setCurrentCondition(nextCond);
+    setLiveWeather(WEATHER_PRESETS[nextCond]);
   };
 
   return (
     <WeatherContext.Provider
       value={{
-        weather: WEATHER_PRESETS[currentCondition],
-        setCondition: setCurrentCondition,
+        weather: liveWeather,
+        setCondition: (c) => {
+          setCurrentCondition(c);
+          setLiveWeather(WEATHER_PRESETS[c]);
+        },
         cycleWeather,
+        refreshLiveWeather,
       }}
     >
       {children}

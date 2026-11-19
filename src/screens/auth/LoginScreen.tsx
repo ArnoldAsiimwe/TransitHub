@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -29,7 +30,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onBackToWelcome,
   onLoginSuccess,
 }) => {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, resetPassword } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [username, setUsername] = useState('');
@@ -38,6 +39,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotInput, setForgotInput] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleForgotPassword = async () => {
+    if (!forgotInput.trim()) {
+      setForgotMsg({ type: 'error', text: 'Please enter your username, email, or phone number.' });
+      return;
+    }
+    setForgotLoading(true);
+    setForgotMsg(null);
+    try {
+      const res = await resetPassword(forgotInput.trim());
+      setForgotLoading(false);
+      if (res.success) {
+        setForgotMsg({ type: 'success', text: res.message });
+      } else {
+        setForgotMsg({ type: 'error', text: res.error || 'Password reset request failed.' });
+      }
+    } catch (e: any) {
+      setForgotLoading(false);
+      setForgotMsg({ type: 'error', text: e.message || 'Error sending reset request.' });
+    }
+  };
 
   const handleLogin = async () => {
     setErrorMessage('');
@@ -155,12 +183,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             <View style={styles.passwordLabelRow}>
               <Text style={styles.inputLabel}>Password</Text>
               <TouchableOpacity
-                onPress={() =>
-                  Alert.alert(
-                    'Reset Password',
-                    'In Phase 2, a verification code will be sent to your phone via SMS.'
-                  )
-                }
+                onPress={() => {
+                  setForgotInput(username);
+                  setForgotMsg(null);
+                  setShowForgotModal(true);
+                }}
               >
                 <Text style={styles.forgotPasswordText}>Forgot password?</Text>
               </TouchableOpacity>
@@ -240,6 +267,80 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Forgot Password Modal */}
+      <Modal visible={showForgotModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.forgotModalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Ionicons name="key-outline" size={20} color={Colors.primary} />
+                <Text style={styles.modalTitle}>Password Recovery</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowForgotModal(false)}>
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.forgotSub}>
+              Enter your username, registered email, or phone number to locate your account and initiate password reset.
+            </Text>
+
+            {forgotMsg && (
+              <View
+                style={[
+                  styles.forgotMsgBanner,
+                  forgotMsg.type === 'success' ? styles.forgotSuccessBanner : styles.forgotErrorBanner,
+                ]}
+              >
+                <Ionicons
+                  name={forgotMsg.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                  size={16}
+                  color={forgotMsg.type === 'success' ? Colors.success : Colors.error}
+                />
+                <Text
+                  style={[
+                    styles.forgotMsgText,
+                    forgotMsg.type === 'success' ? styles.forgotSuccessText : styles.forgotErrorText,
+                  ]}
+                >
+                  {forgotMsg.text}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.forgotInputContainer}>
+              <Ionicons name="person-outline" size={18} color={Colors.textMuted} style={styles.inputLeadingIcon} />
+              <TextInput
+                style={styles.usernameInput}
+                placeholder="Username, email, or phone..."
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                value={forgotInput}
+                onChangeText={setForgotInput}
+              />
+            </View>
+
+            <View style={styles.forgotActionRow}>
+              <Button
+                title="Cancel"
+                variant="outline"
+                size="md"
+                onPress={() => setShowForgotModal(false)}
+                style={styles.forgotCancelBtn}
+              />
+              <Button
+                title="Send Recovery"
+                variant="primary"
+                size="md"
+                loading={forgotLoading}
+                onPress={handleForgotPassword}
+                style={styles.forgotSubmitBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -469,5 +570,92 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  forgotModalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    ...Shadows.modal,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  forgotSub: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    lineHeight: 18,
+  },
+  forgotMsgBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    gap: 8,
+    marginBottom: Spacing.md,
+  },
+  forgotSuccessBanner: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  forgotErrorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  forgotMsgText: {
+    fontSize: Typography.fontSize.xs,
+    flex: 1,
+  },
+  forgotSuccessText: {
+    color: Colors.success,
+    fontWeight: '600',
+  },
+  forgotErrorText: {
+    color: Colors.error,
+    fontWeight: '600',
+  },
+  forgotInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  forgotActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  forgotCancelBtn: {
+    flex: 1,
+  },
+  forgotSubmitBtn: {
+    flex: 1.4,
   },
 });

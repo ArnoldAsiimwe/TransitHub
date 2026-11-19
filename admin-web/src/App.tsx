@@ -199,12 +199,36 @@ export default function App() {
 
   const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
     try {
+      // 1. Update profiles table
       const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-      if (!error) {
-        setProfiles((prev) => prev.map((p) => (p.id === userId ? { ...p, role: newRole } : p)));
-      } else {
+      if (error) {
         alert('Failed to update role: ' + error.message);
+        return;
       }
+
+      setProfiles((prev) => prev.map((p) => (p.id === userId ? { ...p, role: newRole } : p)));
+
+      // 2. If changing to driver, ensure a driver record exists so driver lists/terminals work
+      if (newRole === 'driver') {
+        await supabase.from('drivers').upsert({
+          id: userId,
+          vehicle_type: 'boda',
+          vehicle_plate: 'UBR 000X',
+          vehicle_model: 'Bajaj Boxer BM150',
+          stage_id: 'stg_taxi_park',
+          stage_name: 'Mbarara Central Taxi Park',
+          license_number: 'DL-UG-ADMIN',
+          nin_number: 'CM-PROV-ADMIN',
+          verification_status: 'verified',
+          is_online: true,
+        });
+      } else if (newRole === 'passenger') {
+        // If demoted to passenger, update driver status to rejected/inactive
+        await supabase.from('drivers').update({ verification_status: 'rejected', is_online: false }).eq('id', userId);
+      }
+
+      // 3. Immediately refresh data
+      fetchData();
     } catch (err: any) {
       alert('Error: ' + err.message);
     }

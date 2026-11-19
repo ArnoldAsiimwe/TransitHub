@@ -132,19 +132,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       {driverApplicationStatus === 'verified' && (
         <View style={styles.verifiedDriverCard}>
           <View style={styles.verifiedHeader}>
-            <Ionicons name="shield-checkmark" size={20} color={Colors.success} />
+            <Ionicons name="shield-checkmark" size={20} color={Colors.primary} />
             <Text style={styles.verifiedTitle}>Accredited Municipal Operator</Text>
             <Badge label="Verified" variant="verified" size="sm" />
           </View>
           <Text style={styles.verifiedSub}>
-            Your driver permit is active. Switch between Passenger and Driver mode anytime below.
+            Your driver permit is active. You are registered as an official transit operator. Role changes must be requested through municipal transport administration.
           </Text>
           <Button
-            title={currentRole === 'driver' ? 'Switch to Passenger Mode' : 'Switch to Driver Terminal'}
-            variant="secondary"
+            title="Contact Admin to Revert to Passenger"
+            variant="outline"
             size="sm"
-            iconName={currentRole === 'driver' ? 'person' : 'speedometer'}
-            onPress={() => switchRole(currentRole === 'driver' ? 'passenger' : 'driver')}
+            iconName="call-outline"
+            onPress={() => {
+              Alert.alert(
+                'Municipal Transport Authority',
+                'Registered operators cannot unilaterally demote their accreditation. Please contact Mbarara City Transit Administration or support line (+256 700 000 000).'
+              );
+            }}
             style={styles.switchDriverBtn}
           />
         </View>

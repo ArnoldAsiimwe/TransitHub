@@ -15,6 +15,7 @@ interface AuthContextType {
   login: (phone: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (name: string, phone: string, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (identifierOrEmail: string) => Promise<{ success: boolean; message: string; error?: string }>;
   logout: () => void;
   submitDriverApplication: (data: DriverApplicationData) => void;
   updateDriverOnline: (isOnline: boolean) => void;
@@ -71,9 +72,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setDrivers(fetched);
         }
 
-        // If current user is a driver, check if admin has approved verification in database
+        // If current user is authenticated, check if their role has been updated by admin in Supabase
         if (userProfile.id) {
           const rawId = userProfile.id.replace(/^drv_/, '');
+          
+          // 1. Sync role from profiles table (e.g. admin changed passenger -> driver or admin)
+          const { data: profileRow } = await supabase
+            .from('profiles')
+            .select('role, full_name, phone')
+            .eq('id', rawId)
+            .maybeSingle();
+
+          if (profileRow && profileRow.role && profileRow.role !== currentRole) {
+            setCurrentRole(profileRow.role as UserRole);
+            setUserProfile((prev) => ({
+              ...prev,
+              role: profileRow.role as UserRole,
+              name: profileRow.full_name || prev.name,
+              phone: profileRow.phone || prev.phone,
+            }));
+            if (profileRow.role === 'driver') {
+              setCurrentDriver((prev) => ({
+                ...prev,
+                id: rawId,
+                name: profileRow.full_name || prev.name,
+                phone: profileRow.phone || prev.phone,
+                role: 'driver',
+              }));
+            }
+          }
+
+          // 2. Sync verification and driver online status
           const { data: myDriverRow } = await supabase
             .from('drivers')
             .select('verification_status, is_online')
@@ -306,6 +335,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         signUp,
         loginWithGoogle,
+        resetPassword: async (identifier: string) => {
+          const res = await authService.resetPassword(identifier);
+          return { success: res.success, message: res.message, error: res.error || undefined };
+        },
         logout,
         submitDriverApplication,
         updateDriverOnline,

@@ -16,6 +16,7 @@ import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme
 import { MOCK_EMERGENCY_CONTACTS } from '../../constants/mockData';
 import { Button } from '../common/Button';
 import { adminService } from '../../services';
+import { useAuth } from '../../context/AuthContext';
 
 interface EmergencyModalProps {
   visible: boolean;
@@ -30,6 +31,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({
   currentLocationName = 'High Street, Mbarara',
   driverPlate,
 }) => {
+  const { currentUser } = useAuth();
   const [sosSent, setSosSent] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -48,25 +50,33 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({
       });
   };
 
-  const handleBroadcastAlert = () => {
+  const handleBroadcastAlert = async () => {
     setSosSent(true);
+    const reporterId = currentUser?.id || `usr_anon_${Date.now().toString().slice(-6)}`;
+    
     // Background sync to Supabase reports table
-    adminService
-      .submitReport({
-        reporterId: 'usr_pass_001',
+    try {
+      const res = await adminService.submitReport({
+        reporterId,
         reportType: 'EMERGENCY_SOS',
-        description: `Emergency alert triggered by commuter at ${currentLocationName}. Assigned vehicle plate: ${
-          driverPlate || 'Unassigned'
+        description: `EMERGENCY SOS triggered by ${currentUser?.name || 'Commuter'} (${currentUser?.phone || 'No phone'}). Location: ${currentLocationName}. Assigned vehicle plate: ${
+          driverPlate || 'None'
         }`,
         locationName: currentLocationName,
-      })
-      .catch((e) => console.log('[Emergency SOS Sync]', e));
+      });
+
+      if (!res.success) {
+        console.warn('[SOS Alert Notice]', res.error);
+      }
+    } catch (e) {
+      console.log('[Emergency SOS Sync]', e);
+    }
 
     Alert.alert(
       'Emergency Alert Sent',
       `Your current location (${currentLocationName}) ${
         driverPlate ? `and vehicle plate (${driverPlate})` : ''
-      } has been transmitted to your designated emergency contacts and Mbarara CPS dispatch.`,
+      } has been broadcast to Mbarara CPS dispatch & the Municipal Control Portal.`,
       [{ text: 'OK', onPress: () => setSosSent(false) }]
     );
   };

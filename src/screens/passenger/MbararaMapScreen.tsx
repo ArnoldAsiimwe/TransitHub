@@ -23,14 +23,15 @@ interface MbararaMapScreenProps {
 export const MbararaMapScreen: React.FC<MbararaMapScreenProps> = ({
   onStageSelectedForBooking,
 }) => {
-  const { setPickupStage, setDestinationStage } = useTrip();
+  const { stages, setPickupStage, setDestinationStage } = useTrip();
+  const allStages = stages && stages.length > 0 ? stages : MBARARA_STAGES;
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStage, setSelectedStage] = useState<TransitStage>(MBARARA_STAGES[0]);
+  const [selectedStage, setSelectedStage] = useState<TransitStage>(allStages[0]);
   const [filterDivision, setFilterDivision] = useState<string>('All');
 
-  const divisions = ['All', 'Kamukuzi', 'Kakoba', 'Nyamitanga', 'Biharwe'];
+  const allDivisions = Array.from(new Set(['All', ...allStages.map((s) => s.division)]));
 
-  const filteredStages = MBARARA_STAGES.filter((s) => {
+  const filteredStages = allStages.filter((s) => {
     const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -97,7 +98,7 @@ export const MbararaMapScreen: React.FC<MbararaMapScreenProps> = ({
           showsHorizontalScrollIndicator={false}
           style={styles.divisionScroll}
         >
-          {divisions.map((div) => {
+          {allDivisions.map((div) => {
             const isActive = filterDivision === div;
             return (
               <TouchableOpacity

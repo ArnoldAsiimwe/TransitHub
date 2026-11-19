@@ -25,6 +25,7 @@ interface BottomTabBarProps {
   activeTab: TabKey;
   onTabPress: (tab: TabKey) => void;
   hasActiveTrip?: boolean;
+  currentRole?: string;
 }
 
 const TabButton: React.FC<{
@@ -100,34 +101,35 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   onTabPress,
   hasActiveTrip = false,
+  currentRole = 'passenger',
 }) => {
   const insets = useSafeAreaInsets();
 
   const tabs: TabItem[] = [
     {
       key: 'home',
-      label: 'Home',
-      icon: 'home-outline',
-      activeIcon: 'home',
+      label: currentRole === 'driver' ? 'Terminal' : currentRole === 'admin' ? 'Console' : 'Home',
+      icon: currentRole === 'driver' ? 'speedometer-outline' : currentRole === 'admin' ? 'shield-outline' : 'home-outline',
+      activeIcon: currentRole === 'driver' ? 'speedometer' : currentRole === 'admin' ? 'shield' : 'home',
       badgeCount: hasActiveTrip ? 1 : undefined,
     },
     {
       key: 'map',
-      label: 'My Map',
+      label: 'Stages Map',
       icon: 'map-outline',
       activeIcon: 'map',
     },
     {
       key: 'history',
-      label: 'History',
+      label: currentRole === 'driver' ? 'Trip Log' : 'History',
       icon: 'time-outline',
       activeIcon: 'time',
     },
     {
       key: 'profile',
-      label: 'Profile',
-      icon: 'person-outline',
-      activeIcon: 'person',
+      label: currentRole === 'driver' ? 'Operator' : 'Profile',
+      icon: currentRole === 'driver' ? 'bicycle-outline' : 'person-outline',
+      activeIcon: currentRole === 'driver' ? 'bicycle' : 'person',
     },
   ];
 

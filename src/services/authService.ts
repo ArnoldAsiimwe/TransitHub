@@ -329,6 +329,70 @@ export const authService = {
       return { profile: null, error: err.message || 'Error signing in with Google.' };
     }
   },
+  /**
+   * Reset / Recover Password for Mbarara transit users
+   */
+  async resetPassword(identifierOrEmail: string, newPassword?: string): Promise<{ success: boolean; message: string; error: string | null }> {
+    const cleanId = identifierOrEmail.trim();
+    if (!cleanId) {
+      return { success: false, message: '', error: 'Please enter your username, email, or phone number.' };
+    }
+
+    if (!isSupabaseConfigured()) {
+      return { success: true, message: 'Password reset link sent (Offline demo mode).', error: null };
+    }
+
+    try {
+      // 1. If an email was directly provided
+      if (cleanId.includes('@')) {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanId.toLowerCase(), {
+          redirectTo: AuthSession.makeRedirectUri({ scheme: 'transithub', path: 'auth/reset-password' }),
+        });
+        if (error) {
+          return { success: false, message: '', error: error.message };
+        }
+        return {
+          success: true,
+          message: `Password reset instructions have been dispatched to ${cleanId}. Check your inbox.`,
+          error: null,
+        };
+      }
+
+      // 2. If username or phone was provided, look up the profile email in profiles table
+      const cleanPhone = cleanId.replace(/\s+/g, '');
+      const { data: profileRow } = await supabase
+        .from('profiles')
+        .select('email, phone, full_name')
+        .or(`full_name.eq.${cleanId},phone.eq.${cleanPhone},phone.eq.${cleanId}`)
+        .maybeSingle();
+
+      const targetEmail = profileRow?.email;
+
+      if (targetEmail && targetEmail.includes('@') && !targetEmail.endsWith('@transithub.mbarara.ug')) {
+        const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+          redirectTo: AuthSession.makeRedirectUri({ scheme: 'transithub', path: 'auth/reset-password' }),
+        });
+        if (error) {
+          return { success: false, message: '', error: error.message };
+        }
+        return {
+          success: true,
+          message: `Password recovery instructions have been sent to your registered email (${targetEmail}).`,
+          error: null,
+        };
+      }
+
+      // If user registered with username without an external email, let them know or assist with municipal support
+      return {
+        success: true,
+        message: `Account located for "${profileRow?.full_name || cleanId}". Contact Mbarara Municipality Transit support (+256 700 000 000) or check with the administrator to reset credentials.`,
+        error: null,
+      };
+    } catch (err: any) {
+      return { success: false, message: '', error: err.message || 'Error processing password reset.' };
+    }
+  },
+
   async logout(): Promise<void> {
     if (isSupabaseConfigured()) {
       try {

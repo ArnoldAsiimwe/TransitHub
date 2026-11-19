@@ -32,6 +32,7 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
   onNavigateToTracking,
 }) => {
   const {
+    stages,
     pickupStage,
     destinationStage,
     vehicleType,
@@ -48,12 +49,8 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
   const [showPricePopup, setShowPricePopup] = useState(false);
   const [justSelectedStage, setJustSelectedStage] = useState<TransitStage | null>(null);
 
-  // 2/3 of phone screen height
-  const screenHeight = Dimensions.get('window').height;
-  const mapHeight = Math.round((screenHeight * 2) / 3);
-
-  // Quick stages for quick one-tap commuting
-  const quickStages = MBARARA_STAGES.slice(0, 5);
+  // Quick stages for quick one-tap commuting from dynamic stages
+  const quickStages = (stages || MBARARA_STAGES).slice(0, 5);
 
   const handleQuickRequest = () => {
     requestRide();
@@ -227,23 +224,6 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Real Interactive OpenStreetMap Route View (2/3 of screen) */}
-        <View style={styles.mapContainer}>
-          <OpenStreetMap
-            pickupStage={pickupStage}
-            destinationStage={destinationStage}
-            height={mapHeight}
-            showAllStages={true}
-            onSelectStage={onMapStageSelected}
-          />
-          <View style={styles.mapHintBanner}>
-            <Ionicons name="information-circle" size={14} color={Colors.primary} />
-            <Text style={styles.mapHintText}>
-              Tap any stage pin on the map to set destination & view fare
-            </Text>
-          </View>
-        </View>
-
         {/* Tariff & Fare Estimation Card */}
         <View style={styles.fareCard}>
           <View style={styles.fareRow}>
@@ -359,7 +339,7 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
             </View>
 
             <ScrollView style={styles.stageListScroll}>
-              {MBARARA_STAGES.map((stage) => {
+              {(stages || MBARARA_STAGES).map((stage) => {
                 const isSelected =
                   stagePickerTarget === 'pickup'
                     ? stage.id === pickupStage.id

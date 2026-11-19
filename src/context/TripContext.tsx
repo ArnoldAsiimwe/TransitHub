@@ -2,16 +2,18 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { MBARARA_STAGES, TransitStage } from '../constants/mbararaStages';
 import { calculateTripEstimate } from '../constants/mockData';
 import { DriverProfile, TripRequest, TripStatus, VehicleType } from '../types';
-import { tripService } from '../services';
+import { tripService, stageService } from '../services';
 import { useAuth } from './AuthContext';
 
 interface TripContextType {
+  stages: TransitStage[];
   pickupStage: TransitStage;
   destinationStage: TransitStage;
   vehicleType: VehicleType;
   activeTrip: TripRequest | null;
   incomingDriverRequest: TripRequest | null;
   estimate: { fareUGX: number; distanceKm: number; durationMins: number };
+  refreshStages: () => Promise<void>;
   setPickupStage: (stage: TransitStage) => void;
   setDestinationStage: (stage: TransitStage) => void;
   setVehicleType: (type: VehicleType) => void;
@@ -27,11 +29,30 @@ const TripContext = createContext<TripContextType | undefined>(undefined);
 
 export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, currentRole, driversList } = useAuth();
+  const [stages, setStages] = useState<TransitStage[]>(MBARARA_STAGES);
   const [pickupStage, setPickupStage] = useState<TransitStage>(MBARARA_STAGES[2]); // MUST Main Gate
   const [destinationStage, setDestinationStage] = useState<TransitStage>(MBARARA_STAGES[0]); // Central Taxi Park
   const [vehicleType, setVehicleType] = useState<VehicleType>('boda');
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [incomingDriverRequest, setIncomingDriverRequest] = useState<TripRequest | null>(null);
+
+  const refreshStages = async () => {
+    try {
+      const fetchedStages = await stageService.getStages();
+      if (fetchedStages && fetchedStages.length > 0) {
+        setStages(fetchedStages);
+      }
+    } catch {
+      // Keep existing stages on error
+    }
+  };
+
+  useEffect(() => {
+    refreshStages();
+    // Poll for new stages added by admin every 10 seconds
+    const interval = setInterval(refreshStages, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync incoming requests and active trips across multiple devices via polling / Supabase
   useEffect(() => {
@@ -190,12 +211,14 @@ export const TripProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <TripContext.Provider
       value={{
+        stages,
         pickupStage,
         destinationStage,
         vehicleType,
         activeTrip,
         incomingDriverRequest,
         estimate,
+        refreshStages,
         setPickupStage,
         setDestinationStage,
         setVehicleType,

@@ -19,6 +19,7 @@ import { MBARARA_STAGES, TransitStage } from '../../constants/mbararaStages';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { useAuth } from '../../context/AuthContext';
+import { useTrip } from '../../context/TripContext';
 import { DriverApplicationData, VehicleType } from '../../types';
 
 interface DriverApplicationScreenProps {
@@ -31,10 +32,12 @@ export const DriverApplicationScreen: React.FC<DriverApplicationScreenProps> = (
   onApplicationSubmitted,
 }) => {
   const { currentUser, submitDriverApplication, driverApplicationStatus } = useAuth();
+  const { stages } = useTrip();
+  const allStages = stages && stages.length > 0 ? stages : MBARARA_STAGES;
   const insets = useSafeAreaInsets();
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('boda');
-  const [selectedStage, setSelectedStage] = useState<TransitStage>(MBARARA_STAGES[0]);
+  const [selectedStage, setSelectedStage] = useState<TransitStage>(allStages[0]);
   const [isStageModalOpen, setIsStageModalOpen] = useState(false);
 
   const [vehiclePlate, setVehiclePlate] = useState('');
@@ -382,7 +385,7 @@ export const DriverApplicationScreen: React.FC<DriverApplicationScreenProps> = (
             </View>
 
             <ScrollView style={styles.stageModalList}>
-              {MBARARA_STAGES.map((stage) => {
+              {allStages.map((stage) => {
                 const isSelected = selectedStage.id === stage.id;
                 return (
                   <TouchableOpacity

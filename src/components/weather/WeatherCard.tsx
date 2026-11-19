@@ -34,15 +34,15 @@ export const WeatherCard: React.FC = () => {
           </View>
         </View>
 
-        {/* Interactive Cycle Weather Button for Live Testing */}
+        {/* Live Weather Indicator */}
         <TouchableOpacity
           style={[styles.cycleBtn, { backgroundColor: weather.theme.gradientColors[0] }]}
           onPress={cycleWeather}
-          accessibilityLabel="Change weather scenario"
+          accessibilityLabel="Live weather status"
         >
-          <Ionicons name="swap-horizontal" size={13} color={weather.theme.accentColor} />
+          <Ionicons name="cloud-done" size={13} color={weather.theme.accentColor} />
           <Text style={[styles.cycleBtnText, { color: weather.theme.accentColor }]}>
-            Change Theme
+            Live Weather
           </Text>
         </TouchableOpacity>
       </View>

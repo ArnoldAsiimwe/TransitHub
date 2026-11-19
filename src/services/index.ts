@@ -3,3 +3,4 @@ export * from './authService';
 export * from './driverService';
 export * from './tripService';
 export * from './adminService';
+export * from './stageService';

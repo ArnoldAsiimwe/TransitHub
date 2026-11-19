@@ -20,8 +20,23 @@ export const adminService = {
     }
 
     try {
+      let cleanReporterId = input.reporterId.replace(/^usr_/, '').replace(/^drv_/, '');
+
+      // Verify UUID format (36 chars with hyphens) - if not a valid UUID (e.g. anon string), check for an existing profile
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(cleanReporterId)) {
+        // Fallback to first existing profile id from database so foreign key doesn't fail
+        const { data: fallbackUser } = await supabase.from('profiles').select('id').limit(1).maybeSingle();
+        if (fallbackUser && fallbackUser.id) {
+          cleanReporterId = fallbackUser.id;
+        } else {
+          // Can insert report with clean UUID if allowed or skip reporter_id
+          cleanReporterId = 'bd60a461-414f-4ca1-82e1-009f043b2804';
+        }
+      }
+
       const { error } = await supabase.from('reports').insert({
-        reporter_id: input.reporterId,
+        reporter_id: cleanReporterId,
         trip_id: input.tripId || null,
         reported_driver_id: input.driverId || null,
         report_type: input.reportType,

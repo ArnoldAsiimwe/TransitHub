@@ -252,6 +252,7 @@ export const RootNavigator: React.FC = () => {
       {/* Modern Bottom Navigation Bar (pinned flush to bottom edge) */}
       <BottomTabBar
         activeTab={activeTab}
+        currentRole={currentRole}
         onTabPress={(tab) => {
           animateTabSwitch(tab);
           if (tab === 'home' && currentRole === 'passenger' && activeTrip && activeTrip.status !== 'completed') {

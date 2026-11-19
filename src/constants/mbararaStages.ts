@@ -1,7 +1,7 @@
 export interface TransitStage {
   id: string;
   name: string;
-  division: 'Kakoba' | 'Kamukuzi' | 'Nyamitanga' | 'Biharwe' | 'Kakiika';
+  division: string;
   description: string;
   isMajorHub: boolean;
   latitude: number;
