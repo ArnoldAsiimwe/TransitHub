@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from './supabase';
+import { supabase, setAdminKey, clearAdminKey } from './supabase';
 import {
   Users,
   ShieldCheck,
@@ -13,7 +13,10 @@ import {
   Search,
   AlertTriangle,
   PlusCircle,
-  Trash2
+  Trash2,
+  KeyRound,
+  Lock,
+  AlertCircle
 } from 'lucide-react';
 import {
   UserProfile,
@@ -37,6 +40,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Admin Service Key modal state
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [serviceKeyInput, setServiceKeyInput] = useState('');
+  const [hasCustomKey, setHasCustomKey] = useState(Boolean(localStorage.getItem('transit_admin_key')));
 
   // Stage form modal state
   const [showStageModal, setShowStageModal] = useState(false);
@@ -51,16 +60,22 @@ export default function App() {
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       // 1. Fetch profiles
-      const { data: profData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      const { data: profData, error: profErr } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      if (profErr) {
+        console.warn('Profiles fetch error:', profErr);
+        setFetchError(profErr.message);
+      }
       if (profData) setProfiles(profData);
 
       // 2. Fetch drivers
-      const { data: drivData } = await supabase
+      const { data: drivData, error: drivErr } = await supabase
         .from('drivers')
         .select('*, profiles(id, full_name, phone, role, email)')
         .order('created_at', { ascending: false });
+      if (drivErr) console.warn('Drivers fetch error:', drivErr);
       if (drivData) setDrivers(drivData);
 
       // 3. Fetch trips
@@ -80,11 +95,26 @@ export default function App() {
       // 5. Fetch stages
       const { data: stgData } = await supabase.from('stages').select('*').order('name', { ascending: true });
       if (stgData) setStages(stgData);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching admin data:', err);
+      setFetchError(err.message || 'Error communicating with Supabase');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveServiceKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceKeyInput.trim()) {
+      clearAdminKey();
+      setHasCustomKey(false);
+    } else {
+      setAdminKey(serviceKeyInput.trim());
+      setHasCustomKey(true);
+    }
+    setShowKeyModal(false);
+    setServiceKeyInput('');
+    window.location.reload();
   };
 
   useEffect(() => {
@@ -404,11 +434,28 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Database Status Strip */}
+        {/* Database Status & Authority Strip */}
         <div style={{ padding: '16px', borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-muted)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)' }} />
-            <strong style={{ color: 'var(--text-main)' }}>Live Supabase DB</strong>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: hasCustomKey ? '#8b5cf6' : 'var(--accent)' }} />
+              <strong style={{ color: 'var(--text-main)' }}>{hasCustomKey ? 'Master Admin' : 'Public Anon'}</strong>
+            </div>
+            <button
+              onClick={() => setShowKeyModal(true)}
+              style={{
+                background: 'transparent',
+                color: hasCustomKey ? '#7c3aed' : 'var(--primary)',
+                fontSize: '11px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              {hasCustomKey ? <Lock size={12} /> : <KeyRound size={12} />}
+              {hasCustomKey ? 'Key Set' : 'Add Key'}
+            </button>
           </div>
           <p style={{ wordBreak: 'break-all', fontSize: '10px' }}>lhevzrmskzvablxbrxus.supabase.co</p>
         </div>
@@ -416,6 +463,44 @@ export default function App() {
 
       {/* Main Content Area */}
       <main style={{ flex: 1, padding: '32px', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+        {/* Permission / Fetch Alert if profiles are blocked by RLS */}
+        {fetchError && (
+          <div
+            style={{
+              padding: '14px 18px',
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#92400e' }}>
+              <AlertCircle size={20} color="#d97706" />
+              <span>
+                <strong>Supabase RLS Alert:</strong> {fetchError}. To grant unrestricted master admin rights, enter your <code>service_role</code> secret key or disable RLS for profiles.
+              </span>
+            </div>
+            <button
+              onClick={() => setShowKeyModal(true)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#d97706',
+                color: '#ffffff',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: '700',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Enter Service Key
+            </button>
+          </div>
+        )}
+
         {/* Top bar with Refresh & Quick Stats */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <div>
@@ -1204,6 +1289,81 @@ export default function App() {
                 >
                   Save Stage
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Service Key Authority */}
+      {showKeyModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div style={{ backgroundColor: 'var(--surface)', padding: '28px', borderRadius: 'var(--radius-lg)', width: '500px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <KeyRound size={22} color="var(--primary)" />
+              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Master Admin Supabase Access</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
+              By default, Supabase Row-Level Security (RLS) restricts public access to registered profiles unless an account is signed in or accessed via the <strong>service_role</strong> key.
+            </p>
+
+            <form onSubmit={handleSaveServiceKey} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-sub)' }}>
+                  Supabase service_role Key (Secret)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Paste your service_role key here..."
+                  value={serviceKeyInput}
+                  onChange={(e) => setServiceKeyInput(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', marginTop: '4px', fontSize: '13px' }}
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  Find this in your <strong>Supabase Dashboard ➔ Project Settings ➔ API ➔ service_role secret</strong>.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                {hasCustomKey ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearAdminKey();
+                      setHasCustomKey(false);
+                      setShowKeyModal(false);
+                      window.location.reload();
+                    }}
+                    style={{ padding: '8px 14px', backgroundColor: 'transparent', color: 'var(--danger)', fontSize: '12px', fontWeight: '600' }}
+                  >
+                    Reset to Default Key
+                  </button>
+                ) : <span />}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyModal(false)}
+                    style={{ padding: '8px 16px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-sm)', fontSize: '13px', fontWeight: '600' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#ffffff', borderRadius: 'var(--radius-sm)', fontSize: '13px', fontWeight: '700' }}
+                  >
+                    Apply Key
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -247,10 +247,10 @@ export const DriverDashboardScreen: React.FC = () => {
                 activeTrip.status === 'accepted'
                   ? 'Confirm Arrived at Pickup Stage'
                   : activeTrip.status === 'arriving'
-                  ? 'Start Trip (Passenger Onboard)'
-                  : activeTrip.status === 'in_transit'
-                  ? 'Complete Trip & Collect Fare'
-                  : 'Dismiss Completed Trip'
+                    ? 'Start Trip (Passenger Onboard)'
+                    : activeTrip.status === 'in_transit'
+                      ? 'Complete Trip & Collect Fare'
+                      : 'Dismiss Completed Trip'
               }
               variant={activeTrip.status === 'in_transit' ? 'secondary' : 'primary'}
               onPress={handleAdvanceActiveTrip}
