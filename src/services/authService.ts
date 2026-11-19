@@ -184,7 +184,7 @@ export const authService = {
   },
 
   /**
-   * Sign in with Google via Supabase OAuth
+   * Sign in with Google via Supabase OAuth (supports PKCE code exchange & implicit token flows)
    */
   async signInWithGoogle(): Promise<{ profile: UserProfile | null; error: string | null }> {
     if (!isSupabaseConfigured()) {
@@ -192,10 +192,13 @@ export const authService = {
     }
 
     try {
+      // 1. Generate the redirect URI pointing back to TransitHub
       const redirectUrl = AuthSession.makeRedirectUri({
         scheme: 'transithub',
+        path: 'auth/callback',
       });
 
+      // 2. Request OAuth authorization URL from Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -212,55 +215,112 @@ export const authService = {
         return { profile: null, error: 'Unable to initialize Google Sign In URL.' };
       }
 
+      // 3. Open the authentication browser session
       const res = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
       if (res.type === 'success' && res.url) {
-        // Extract access_token & refresh_token from url fragment or query
-        const urlObj = new URL(res.url);
-        const params = new URLSearchParams(urlObj.hash.substring(1) || urlObj.search);
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+        // Extract parameters from both hash (#) and search query (?)
+        const rawUrl = res.url;
+        let accessToken: string | null = null;
+        let refreshToken: string | null = null;
+        let authCode: string | null = null;
 
-        if (accessToken && refreshToken) {
+        // Try extracting code
+        const codeMatch = rawUrl.match(/[?&]code=([^&#]+)/);
+        if (codeMatch) {
+          authCode = decodeURIComponent(codeMatch[1]);
+        }
+
+        // Try extracting tokens
+        const accessMatch = rawUrl.match(/[#?&]access_token=([^&#]+)/);
+        const refreshMatch = rawUrl.match(/[#?&]refresh_token=([^&#]+)/);
+        if (accessMatch && refreshMatch) {
+          accessToken = decodeURIComponent(accessMatch[1]);
+          refreshToken = decodeURIComponent(refreshMatch[1]);
+        }
+
+        let authenticatedUser: any = null;
+
+        // Flow A: PKCE exchange with auth code
+        if (authCode) {
+          const { data: exchangeData, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(authCode);
+          if (exchangeErr) {
+            console.warn('[Google Auth Code Exchange Error]', exchangeErr.message);
+          } else if (exchangeData?.user) {
+            authenticatedUser = exchangeData.user;
+          }
+        }
+
+        // Flow B: Direct token setSession if code wasn't provided or needed
+        if (!authenticatedUser && accessToken && refreshToken) {
           const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-
           if (sessionErr) {
-            return { profile: null, error: sessionErr.message };
+            console.warn('[Google Token Session Error]', sessionErr.message);
+          } else if (sessionData?.user) {
+            authenticatedUser = sessionData.user;
           }
+        }
 
-          if (sessionData.user) {
-            const user = sessionData.user;
-            const fullName = user.user_metadata?.full_name || user.user_metadata?.name || 'Google Commuter';
-            const phone = user.user_metadata?.phone || '+256 700 000 000';
-            const email = user.email || '';
+        // Flow C: Check active Supabase session if browser closed back
+        if (!authenticatedUser) {
+          const { data: currentSession } = await supabase.auth.getSession();
+          if (currentSession?.session?.user) {
+            authenticatedUser = currentSession.session.user;
+          }
+        }
 
-            // Ensure profile exists in profiles table
+        if (authenticatedUser) {
+          const user = authenticatedUser;
+          const fullName =
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name ||
+            user.email?.split('@')[0] ||
+            'Google Commuter';
+          const phone = user.user_metadata?.phone || '';
+          const email = user.email || '';
+
+          // 4. Ensure profile exists in profiles table
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          let userRole: UserRole = 'passenger';
+          if (existingProfile) {
+            userRole = (existingProfile.role as UserRole) || 'passenger';
+          } else {
+            // Upsert new profile record for the Google user
             await supabase.from('profiles').upsert({
               id: user.id,
               full_name: fullName,
-              phone: phone,
+              phone: phone || `usr_${user.id.slice(0, 8)}`,
               email: email,
               role: 'passenger',
             });
-
-            const profile: UserProfile = {
-              id: user.id,
-              name: fullName,
-              phone: phone,
-              email: email,
-              role: 'passenger',
-              joinedDate: 'Active Member',
-            };
-
-            return { profile, error: null };
           }
+
+          const profile: UserProfile = {
+            id: user.id,
+            name: existingProfile?.full_name || fullName,
+            phone: existingProfile?.phone || phone,
+            email: email,
+            role: userRole,
+            joinedDate: existingProfile?.created_at
+              ? new Date(existingProfile.created_at).toLocaleDateString()
+              : 'Today',
+          };
+
+          return { profile, error: null };
         }
+
+        return { profile: null, error: 'Authentication could not establish a user session.' };
       }
 
-      if (res.type === 'cancel') {
+      if (res.type === 'cancel' || res.type === 'dismiss') {
         return { profile: null, error: 'Google sign in was cancelled.' };
       }
 
