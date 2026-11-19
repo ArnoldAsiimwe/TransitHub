@@ -16,7 +16,12 @@ import {
   Trash2,
   KeyRound,
   Lock,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  X,
+  CreditCard,
+  FileText,
+  BadgeCheck
 } from 'lucide-react';
 import {
   UserProfile,
@@ -46,6 +51,9 @@ export default function App() {
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [serviceKeyInput, setServiceKeyInput] = useState('');
   const [hasCustomKey, setHasCustomKey] = useState(Boolean(localStorage.getItem('transit_admin_key')));
+
+  // Review Driver Modal state
+  const [selectedDriverForReview, setSelectedDriverForReview] = useState<DriverRecord | null>(null);
 
   // Stage form modal state
   const [showStageModal, setShowStageModal] = useState(false);
@@ -127,15 +135,43 @@ export default function App() {
   // Actions
   const handleUpdateDriverStatus = async (driverId: string, status: VerificationStatus) => {
     try {
+      const updatePayload: { verification_status: VerificationStatus; is_online?: boolean } = {
+        verification_status: status,
+      };
+      if (status === 'verified') {
+        updatePayload.is_online = true; // Auto-activate driver when approved
+      } else if (status === 'rejected') {
+        updatePayload.is_online = false;
+      }
+
       const { error } = await supabase
         .from('drivers')
-        .update({ verification_status: status })
+        .update(updatePayload)
         .eq('id', driverId);
 
       if (!error) {
         setDrivers((prev) =>
-          prev.map((d) => (d.id === driverId ? { ...d, verification_status: status } : d))
+          prev.map((d) =>
+            d.id === driverId
+              ? {
+                  ...d,
+                  verification_status: status,
+                  is_online: status === 'verified' ? true : status === 'rejected' ? false : d.is_online,
+                }
+              : d
+          )
         );
+        if (selectedDriverForReview && selectedDriverForReview.id === driverId) {
+          setSelectedDriverForReview((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  verification_status: status,
+                  is_online: status === 'verified' ? true : status === 'rejected' ? false : prev.is_online,
+                }
+              : null
+          );
+        }
       } else {
         alert('Failed to update driver status: ' + error.message);
       }
@@ -650,10 +686,28 @@ export default function App() {
                           <div>
                             <div style={{ fontWeight: '700', fontSize: '14px' }}>{d.profiles?.full_name || 'Driver'}</div>
                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                              Plate: <strong>{d.vehicle_plate}</strong> • {d.stage_name}
+                              Plate: <strong>{d.vehicle_plate}</strong> • {d.vehicle_type ? d.vehicle_type.toUpperCase() : 'VEHICLE'} • {d.stage_name}
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => setSelectedDriverForReview(d)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: 'var(--surface)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--text-main)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                            >
+                              <Eye size={13} />
+                              Review
+                            </button>
                             <button
                               onClick={() => handleUpdateDriverStatus(d.id, 'verified')}
                               style={{
@@ -844,7 +898,25 @@ export default function App() {
                         </button>
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
+                            onClick={() => setSelectedDriverForReview(d)}
+                            style={{
+                              padding: '6px 10px',
+                              backgroundColor: 'var(--surface)',
+                              border: '1px solid var(--border)',
+                              color: 'var(--text-main)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Eye size={12} />
+                            Details
+                          </button>
                           {d.verification_status !== 'verified' && (
                             <button
                               onClick={() => handleUpdateDriverStatus(d.id, 'verified')}
@@ -1196,6 +1268,290 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Modal: Driver Application Verification & Approval */}
+      {selectedDriverForReview && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 110,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--surface)',
+              padding: '30px',
+              borderRadius: 'var(--radius-lg)',
+              width: '560px',
+              maxWidth: '92vw',
+              boxShadow: 'var(--shadow-lg)',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '50%',
+                    backgroundColor: '#EFF6FF',
+                    color: '#2563EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BadgeCheck size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                    Driver Credential Verification
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                    Verify applicant identity, vehicle, and stage endorsement
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedDriverForReview(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Current Status Banner */}
+            <div
+              style={{
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor:
+                  selectedDriverForReview.verification_status === 'verified'
+                    ? '#EFF6FF'
+                    : selectedDriverForReview.verification_status === 'pending'
+                    ? '#FEF3C7'
+                    : '#FEE2E2',
+                border:
+                  selectedDriverForReview.verification_status === 'verified'
+                    ? '1px solid #BFDBFE'
+                    : selectedDriverForReview.verification_status === 'pending'
+                    ? '1px solid #FDE68A'
+                    : '1px solid #FECACA',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    textTransform: 'uppercase',
+                    color:
+                      selectedDriverForReview.verification_status === 'verified'
+                        ? '#2563EB'
+                        : selectedDriverForReview.verification_status === 'pending'
+                        ? '#D97706'
+                        : '#DC2626',
+                  }}
+                >
+                  Status: {selectedDriverForReview.verification_status}
+                </span>
+                {selectedDriverForReview.verification_status === 'verified' && (
+                  <span
+                    style={{
+                      backgroundColor: '#2563EB',
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '9999px',
+                      fontWeight: '700',
+                    }}
+                  >
+                    ✓ Blue Badge Issued
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {selectedDriverForReview.is_online ? '● Online & Dispatchable' : '○ Offline'}
+              </span>
+            </div>
+
+            {/* Verification Detail Fields Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '22px' }}>
+              {/* Full Name */}
+              <div style={{ padding: '12px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                  Applicant Full Name
+                </span>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)', marginTop: '4px', margin: 0 }}>
+                  {selectedDriverForReview.profiles?.full_name || 'Driver Applicant'}
+                </p>
+                <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>
+                  Phone: {selectedDriverForReview.profiles?.phone || 'No phone'}
+                </span>
+              </div>
+
+              {/* National Identification Number (NIN) */}
+              <div style={{ padding: '12px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CreditCard size={14} color="var(--primary)" />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                    National ID (NIN)
+                  </span>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: '800', fontFamily: 'monospace', color: '#1e293b', marginTop: '4px', margin: 0 }}>
+                  {selectedDriverForReview.nin_number || 'NIN Not Provided'}
+                </p>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Republic of Uganda</span>
+              </div>
+
+              {/* Vehicle Type & Number Plate */}
+              <div style={{ padding: '12px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                  Vehicle Category & Plate
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      backgroundColor: '#FEF3C7',
+                      color: '#92400E',
+                      fontWeight: '800',
+                      fontSize: '13px',
+                      borderRadius: 'var(--radius-sm)',
+                      letterSpacing: '0.5px',
+                    }}
+                  >
+                    {selectedDriverForReview.vehicle_plate}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      textTransform: 'uppercase',
+                      padding: '3px 8px',
+                      backgroundColor: 'var(--surface)',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    {selectedDriverForReview.vehicle_type || 'boda'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-sub)', marginTop: '4px' }}>
+                  Model: {selectedDriverForReview.vehicle_model || 'Standard'}
+                </div>
+              </div>
+
+              {/* Driving Permit / License */}
+              <div style={{ padding: '12px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={14} color="var(--primary)" />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                    Driving Permit No.
+                  </span>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: '800', fontFamily: 'monospace', color: '#1e293b', marginTop: '4px', margin: 0 }}>
+                  {selectedDriverForReview.license_number || 'Not Submitted'}
+                </p>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  PSV Badge: {selectedDriverForReview.psv_badge_number || 'MBR-REG'}
+                </span>
+              </div>
+
+              {/* Stage Base & Chairperson Recommendation */}
+              <div style={{ gridColumn: 'span 2', padding: '12px', backgroundColor: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                  Transit Stage Base & Chairperson Endorsement
+                </span>
+                <p style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginTop: '4px', margin: 0 }}>
+                  📍 {selectedDriverForReview.stage_name}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-sub)', marginTop: '4px', margin: 0 }}>
+                  Chairperson: <strong>{selectedDriverForReview.stage_chairperson_name || 'Stage Leadership Committee'}</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Admin Decision Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '18px' }}>
+              <button
+                type="button"
+                onClick={() => setSelectedDriverForReview(null)}
+                style={{
+                  padding: '10px 18px',
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--text-sub)',
+                }}
+              >
+                Close
+              </button>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleUpdateDriverStatus(selectedDriverForReview.id, 'rejected');
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--danger)',
+                    color: 'var(--danger)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                  }}
+                >
+                  Reject Application
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleUpdateDriverStatus(selectedDriverForReview.id, 'verified');
+                  }}
+                  style={{
+                    padding: '10px 22px',
+                    backgroundColor: '#2563EB',
+                    color: '#ffffff',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 8px rgba(37,99,235,0.3)',
+                  }}
+                >
+                  <BadgeCheck size={16} />
+                  Approve & Issue Royal Blue Badge
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Add Transit Stage */}
       {showStageModal && (

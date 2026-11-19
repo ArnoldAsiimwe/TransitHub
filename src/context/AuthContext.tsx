@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { DriverApplicationData, DriverProfile, UserProfile, UserRole, VerificationStatus } from '../types';
 import { MOCK_DRIVERS } from '../constants/mockData';
 import { authService, driverService } from '../services';
-import { isSupabaseConfigured } from '../services/supabase';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 interface AuthContextType {
   currentUser: UserProfile | DriverProfile;
@@ -69,6 +69,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fetched = await driverService.getAvailableDrivers();
         if (fetched) {
           setDrivers(fetched);
+        }
+
+        // If current user is a driver, check if admin has approved verification in database
+        if (userProfile.id) {
+          const rawId = userProfile.id.replace(/^drv_/, '');
+          const { data: myDriverRow } = await supabase
+            .from('drivers')
+            .select('verification_status, is_online')
+            .eq('id', rawId)
+            .maybeSingle();
+
+          if (myDriverRow && myDriverRow.verification_status) {
+            setDriverApplicationStatus(myDriverRow.verification_status);
+            setCurrentDriver((prev) => ({
+              ...prev,
+              verificationStatus: myDriverRow.verification_status,
+              isOnline: myDriverRow.is_online,
+            }));
+          }
         }
       } catch (err) {
         // silent fail
@@ -203,11 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const submitDriverApplication = (data: DriverApplicationData) => {
-    setDriverApplicationData(data);
-    setDriverApplicationStatus('verified'); // Driver application approved & account upgraded
-    setCurrentRole('driver'); // Automatically switch role to driver
-
-    // Create accredited driver profile linked to current user
+    // Create pending driver profile linked to current user awaiting admin approval
     const rawId = userProfile.id.replace(/^drv_/, '');
     const newDriver: DriverProfile = {
       id: rawId,
@@ -223,19 +238,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       stageName: data.stageName,
       rating: 5.0,
       totalTrips: 0,
-      isOnline: true,
-      verificationStatus: 'verified',
+      isOnline: false,
+      verificationStatus: 'pending',
       licenseNumber: data.licenseNumber,
       ninNumber: data.ninNumber,
       psvBadgeNumber: data.psvBadgeNumber || 'MBR-REG',
       lastActive: 'Just now',
     };
 
+    setDriverApplicationData(data);
+    setDriverApplicationStatus('pending'); // Marked as pending awaiting admin verification
+    setCurrentRole('driver');
     setCurrentDriver(newDriver);
-    setDrivers((prev) => {
-      const filtered = prev.filter((d) => d.id !== newDriver.id);
-      return [newDriver, ...filtered];
-    });
 
     // Sync with Supabase in background
     driverService
@@ -243,7 +257,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then(() => {
         // Refresh available drivers list from Supabase
         driverService.getAvailableDrivers().then((freshList) => {
-          if (freshList && freshList.length > 0) {
+          if (freshList) {
             setDrivers(freshList);
           }
         }).catch(() => {});

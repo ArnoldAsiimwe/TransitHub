@@ -33,8 +33,8 @@ export const Badge: React.FC<BadgeProps> = ({
 
   switch (variant) {
     case 'verified':
-      bgColor = Colors.successSurface;
-      textColor = Colors.success;
+      bgColor = '#EFF6FF'; // Blue tint surface
+      textColor = '#2563EB'; // Royal blue
       iconName = 'checkmark-circle';
       break;
     case 'pending':

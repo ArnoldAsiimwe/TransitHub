@@ -26,12 +26,12 @@ export const driverService = {
       stageName: data.stageName,
       rating: 5.0,
       totalTrips: 0,
-      isOnline: true,
-      verificationStatus: 'verified',
+      isOnline: false,
+      verificationStatus: 'pending',
       licenseNumber: data.licenseNumber,
       ninNumber: data.ninNumber,
       psvBadgeNumber: data.psvBadgeNumber || 'MBR-REG',
-      lastActive: 'Online now',
+      lastActive: 'Just now',
     };
 
     if (!isSupabaseConfigured()) {
@@ -39,7 +39,7 @@ export const driverService = {
     }
 
     try {
-      // 1. Ensure user profile exists or role is updated to driver
+      // 1. Ensure user profile exists or role is updated
       await supabase.from('profiles').upsert({
         id: rawUserId,
         full_name: userName,
@@ -47,7 +47,7 @@ export const driverService = {
         role: 'driver',
       });
 
-      // 2. Upsert into drivers table
+      // 2. Upsert into drivers table with pending verification for admin approval
       const { error } = await supabase.from('drivers').upsert({
         id: rawUserId,
         vehicle_type: data.vehicleType,
@@ -59,8 +59,8 @@ export const driverService = {
         nin_number: data.ninNumber,
         psv_badge_number: data.psvBadgeNumber || null,
         stage_chairperson_name: data.stageChairpersonName || null,
-        verification_status: 'verified',
-        is_online: true,
+        verification_status: 'pending',
+        is_online: false,
       });
 
       if (error) {
