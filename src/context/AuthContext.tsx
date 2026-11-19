@@ -31,7 +31,7 @@ const DEFAULT_USER: UserProfile = {
 };
 
 const createDriverFromUser = (user: UserProfile): DriverProfile => ({
-  id: `drv_${user.id || 'default'}`,
+  id: user.id || 'default',
   name: user.name || 'Transit Operator',
   phone: user.phone || '',
   role: 'driver',
@@ -40,8 +40,8 @@ const createDriverFromUser = (user: UserProfile): DriverProfile => ({
   vehicleType: 'boda',
   vehiclePlate: 'UEX 000A',
   vehicleModel: 'Bajaj Boxer BM150',
-  stageId: 'stg_garamba',
-  stageName: 'Garamba Stage',
+  stageId: 'stg_taxi_park',
+  stageName: 'Mbarara Central Taxi Park',
   rating: 5.0,
   totalTrips: 0,
   isOnline: true,
@@ -58,27 +58,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentRole, setCurrentRole] = useState<UserRole>('passenger');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER);
-  const [drivers, setDrivers] = useState<DriverProfile[]>(
-    isSupabaseConfigured() ? [] : MOCK_DRIVERS
-  );
+  const [drivers, setDrivers] = useState<DriverProfile[]>([]);
   const [currentDriver, setCurrentDriver] = useState<DriverProfile>(() =>
     createDriverFromUser(DEFAULT_USER)
   );
 
+  const refreshDriversList = async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        const fetched = await driverService.getAvailableDrivers();
+        if (fetched) {
+          setDrivers(fetched);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    if (isSupabaseConfigured()) {
-      driverService
-        .getAvailableDrivers()
-        .then((fetched) => {
-          if (isMounted) {
-            setDrivers(fetched);
-          }
-        })
-        .catch(() => {});
-    }
+    refreshDriversList();
+
+    // Poll for newly registered drivers across all member devices every 4 seconds
+    const interval = setInterval(() => {
+      if (isMounted) {
+        refreshDriversList();
+      }
+    }, 4000);
+
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, [isAuthenticated]);
 
@@ -197,8 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentRole('driver'); // Automatically switch role to driver
 
     // Create accredited driver profile linked to current user
+    const rawId = userProfile.id.replace(/^drv_/, '');
     const newDriver: DriverProfile = {
-      id: `drv_${userProfile.id}`,
+      id: rawId,
       name: userProfile.name,
       phone: userProfile.phone,
       email: userProfile.email,
@@ -227,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Sync with Supabase in background
     driverService
-      .submitApplication(userProfile.id, userProfile.name, userProfile.phone, data)
+      .submitApplication(rawId, userProfile.name, userProfile.phone, data)
       .then(() => {
         // Refresh available drivers list from Supabase
         driverService.getAvailableDrivers().then((freshList) => {

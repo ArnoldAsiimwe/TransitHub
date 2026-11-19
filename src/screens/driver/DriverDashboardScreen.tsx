@@ -92,7 +92,7 @@ export const DriverDashboardScreen: React.FC = () => {
 
             <View style={styles.driverInfo}>
               <View style={styles.driverNameRow}>
-                <Text style={styles.driverName}>{driver.name || 'Mugisha Dennis'}</Text>
+                <Text style={styles.driverName}>{driver.name || 'Transit Driver'}</Text>
                 <Badge
                   label={driver.verificationStatus || 'verified'}
                   variant={driver.verificationStatus === 'verified' ? 'verified' : 'pending'}
@@ -100,10 +100,10 @@ export const DriverDashboardScreen: React.FC = () => {
                 />
               </View>
               <Text style={styles.driverSub}>
-                {driver.vehiclePlate || 'UFM 842X'} • {driver.vehicleModel || 'Bajaj Boxer 100'}
+                {driver.vehiclePlate || 'PENDING'} • {driver.vehicleModel || 'Registered Vehicle'}
               </Text>
               <Text style={styles.driverStage}>
-                Stage: {driver.stageName || 'Central Taxi Park'}
+                Stage: {driver.stageName || 'Mbarara Central Taxi Park'}
               </Text>
             </View>
           </View>

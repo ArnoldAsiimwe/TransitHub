@@ -297,41 +297,51 @@ export const PassengerHomeScreen: React.FC<PassengerHomeScreenProps> = ({
             </TouchableOpacity>
           </View>
 
-          {driversList.slice(0, 2).map((driver) => (
-            <TouchableOpacity
-              key={driver.id}
-              style={styles.driverMiniCard}
-              onPress={() => {
-                requestRide(driver);
-                onNavigateToTracking();
-              }}
-            >
-              <View style={styles.driverAvatar}>
-                <Ionicons
-                  name={driver.vehicleType === 'boda' ? 'bicycle' : 'car'}
-                  size={20}
-                  color={Colors.primaryDark}
-                />
-              </View>
-              <View style={styles.driverMiniInfo}>
-                <View style={styles.driverNameRow}>
-                  <Text style={styles.driverMiniName}>{driver.name}</Text>
-                  <Badge label={driver.verificationStatus} variant="verified" size="sm" />
+          {driversList.length === 0 ? (
+            <View style={styles.emptyDriversBox}>
+              <Ionicons name="bicycle-outline" size={32} color={Colors.textMuted} />
+              <Text style={styles.emptyDriversTitle}>No Drivers Registered Yet</Text>
+              <Text style={styles.emptyDriversSub}>
+                When a group member applies as a driver, their profile and vehicle will appear here automatically.
+              </Text>
+            </View>
+          ) : (
+            driversList.slice(0, 3).map((driver) => (
+              <TouchableOpacity
+                key={driver.id}
+                style={styles.driverMiniCard}
+                onPress={() => {
+                  requestRide(driver);
+                  onNavigateToTracking();
+                }}
+              >
+                <View style={styles.driverAvatar}>
+                  <Ionicons
+                    name={driver.vehicleType === 'boda' ? 'bicycle' : 'car'}
+                    size={20}
+                    color={Colors.primaryDark}
+                  />
                 </View>
-                <Text style={styles.driverMiniVehicle}>
-                  {driver.vehicleModel} • {driver.vehiclePlate}
-                </Text>
-                <Text style={styles.driverMiniStage}>Stage: {driver.stageName}</Text>
-              </View>
-              <View style={styles.driverMiniAction}>
-                <View style={styles.ratingBadge}>
-                  <Ionicons name="star" size={12} color="#D97706" />
-                  <Text style={styles.ratingText}>{driver.rating}</Text>
+                <View style={styles.driverMiniInfo}>
+                  <View style={styles.driverNameRow}>
+                    <Text style={styles.driverMiniName}>{driver.name}</Text>
+                    <Badge label={driver.verificationStatus} variant="verified" size="sm" />
+                  </View>
+                  <Text style={styles.driverMiniVehicle}>
+                    {driver.vehicleModel} • {driver.vehiclePlate}
+                  </Text>
+                  <Text style={styles.driverMiniStage}>Stage: {driver.stageName}</Text>
                 </View>
-                <Text style={styles.tapToBook}>Tap to book</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.driverMiniAction}>
+                  <View style={styles.ratingBadge}>
+                    <Ionicons name="star" size={12} color="#D97706" />
+                    <Text style={styles.ratingText}>{driver.rating}</Text>
+                  </View>
+                  <Text style={styles.tapToBook}>Tap to book</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -766,6 +776,29 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  emptyDriversBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.card,
+  },
+  emptyDriversTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginTop: Spacing.sm,
+  },
+  emptyDriversSub: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
   },
   driverMiniCard: {
     flexDirection: 'row',

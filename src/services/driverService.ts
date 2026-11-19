@@ -12,8 +12,9 @@ export const driverService = {
     userPhone: string,
     data: DriverApplicationData
   ): Promise<{ success: boolean; driver: DriverProfile | null; error: string | null }> {
+    const rawUserId = userId.replace(/^drv_/, '');
     const formattedDriver: DriverProfile = {
-      id: userId.startsWith('drv_') ? userId : `drv_${userId}`,
+      id: rawUserId,
       name: userName,
       phone: userPhone,
       role: 'driver',
@@ -38,8 +39,17 @@ export const driverService = {
     }
 
     try {
+      // 1. Ensure user profile exists or role is updated to driver
+      await supabase.from('profiles').upsert({
+        id: rawUserId,
+        full_name: userName,
+        phone: userPhone || `usr_${rawUserId.slice(0, 8)}`,
+        role: 'driver',
+      });
+
+      // 2. Upsert into drivers table
       const { error } = await supabase.from('drivers').upsert({
-        id: userId,
+        id: rawUserId,
         vehicle_type: data.vehicleType,
         vehicle_plate: data.vehiclePlate.toUpperCase(),
         vehicle_model: data.vehicleModel,
@@ -54,11 +64,9 @@ export const driverService = {
       });
 
       if (error) {
+        console.warn('[Driver Application Error]', error.message);
         return { success: false, driver: null, error: error.message };
       }
-
-      // Also ensure role is updated to driver in profiles
-      await supabase.from('profiles').update({ role: 'driver' }).eq('id', userId);
 
       return { success: true, driver: formattedDriver, error: null };
     } catch (err: any) {
@@ -71,9 +79,7 @@ export const driverService = {
    */
   async getAvailableDrivers(vehicleTypeFilter?: VehicleType): Promise<DriverProfile[]> {
     if (!isSupabaseConfigured()) {
-      return vehicleTypeFilter
-        ? MOCK_DRIVERS.filter((d) => d.vehicleType === vehicleTypeFilter)
-        : MOCK_DRIVERS;
+      return [];
     }
 
     try {
@@ -81,7 +87,7 @@ export const driverService = {
         .from('drivers')
         .select('*, profiles(full_name, phone, email)');
 
-      if (vehicleTypeFilter) {
+      if (vehicleTypeFilter && vehicleTypeFilter !== ('all' as any)) {
         query = query.eq('vehicle_type', vehicleTypeFilter);
       }
 
@@ -92,7 +98,7 @@ export const driverService = {
 
       return data.map((d: any) => ({
         id: d.id,
-        name: d.profiles?.full_name || 'Mbarara Rider',
+        name: d.profiles?.full_name || 'Mbarara Driver',
         phone: d.profiles?.phone || '+256 700 000 000',
         email: d.profiles?.email,
         role: 'driver',
@@ -100,8 +106,8 @@ export const driverService = {
         vehicleType: d.vehicle_type as VehicleType,
         vehiclePlate: d.vehicle_plate || 'UEX 000A',
         vehicleModel: d.vehicle_model || 'Bajaj Boxer BM150',
-        stageId: d.stage_id || 'stg_garamba',
-        stageName: d.stage_name || 'Garamba Stage',
+        stageId: d.stage_id || 'stg_taxi_park',
+        stageName: d.stage_name || 'Mbarara Central Taxi Park',
         rating: Number(d.rating) || 5.0,
         totalTrips: d.total_trips || 0,
         isOnline: d.is_online !== false,
